@@ -69,10 +69,10 @@ These projects showcase my passion for data science and my ability to apply my s
 
 ## Contact
 
-* Email: \[Your Email Address]
-* LinkedIn: \[Your LinkedIn Profile URL]
+* Email: (jared.r.wiltshire@gmail.com)
+* LinkedIn: (https://www.linkedin.com/in/jared-r-wiltshire-86757651/)
 
 ## Links
 
 * Resume: \[Link to your online resume] (Optional)
-* GitHub: \[Link to your GitHub profile]
+* GitHub: https://github.com/jrichwiltshire
