@@ -48,7 +48,7 @@ These projects showcase my passion for data science and my ability to apply my s
 
 ## Contact
 
-* Email: (jared.r.wiltshire@gmail.com)
+* Email: jared.r.wiltshire@gmail.com
 * LinkedIn: [Jared R Wiltshire LinkedIn](https://www.linkedin.com/in/jared-r-wiltshire-86757651/)
 
 ## Links
