@@ -28,15 +28,6 @@ These projects highlight my experience in applying data science and analytics to
     * Enabled sales leadership to self-service sales representative region assignments.
 * **View Anonymized Project:** [Link to `projects/work_projects/GeospatialSolution_Anonymized/README.md`] (Replace with actual link)
 
-### Statistical Modeling for Resource Optimization (Anonymized)
-
-* **Description:** Analyzed statistical models to optimize funding allocation, balancing provider compensation with service expansion.
-* **Technologies Used:** Python, SQL, statistical modeling libraries
-* **Key Achievements:**
-    * Devised multivariate optimization algorithm balancing provider compensation (achieving 60% rate increase) with service expansion (14,000 new users) (as stated on resume)
-    * Authored recommendations to the state legislature on the best strategy for maximizing federal funds
-* **View Anonymized Project:** [Link to `projects/work_projects/StatisticalModeling_Anonymized/README.md`] (Replace with actual link)
-
 ## Personal Projects
 
 These projects showcase my passion for data science and my ability to apply my skills to personal interests and explore new technologies.
@@ -46,18 +37,6 @@ These projects showcase my passion for data science and my ability to apply my s
 * **Description:** Developed an interactive web application to visualize my travel photos on a map, allowing users to explore locations, view photos, and learn about my travel experiences.
 * **Technologies Used:** Python, Flask, Leaflet (JavaScript mapping library), SQL (for storing photo metadata)
 * **View Project:** [Link to `projects/personal_projects/TravelPhotoMap/README.md`] (Replace with actual link)
-
-### Football Analytics Dashboard
-
-* **Description:** Built a dashboard to visualize and analyze football statistics, providing insights into player performance, team trends, and game outcomes.
-* **Technologies Used:** Python, Pandas, Plotly/Dash (or Streamlit), web scraping libraries (BeautifulSoup/Scrapy)
-* **View Project:** [Link to `projects/personal_projects/FootballAnalyticsDashboard/README.md`] (Replace with actual link)
-
-### Bike Route Optimization App
-
-* **Description:** Created an application to optimize bike routes based on user preferences, considering factors like distance, elevation gain, safety, and bike lane availability.
-* **Technologies Used:** Python, a mapping API (e.g., Google Maps API or similar), graph algorithms (NetworkX)
-* **View Project:** [Link to `projects/personal_projects/BikeRouteOptimizationApp/README.md`] (Replace with actual link)
 
 ## Skills
 
@@ -70,9 +49,9 @@ These projects showcase my passion for data science and my ability to apply my s
 ## Contact
 
 * Email: (jared.r.wiltshire@gmail.com)
-* LinkedIn: (https://www.linkedin.com/in/jared-r-wiltshire-86757651/)
+* LinkedIn: [Jared R Wiltshire LinkedIn](https://www.linkedin.com/in/jared-r-wiltshire-86757651/)
 
 ## Links
 
-* Resume: \[Link to your online resume] (Optional)
-* GitHub: https://github.com/jrichwiltshire
+* Resume: [Jared R Wiltshire Resume](https://github.com/jrichwiltshire/Portfolio/blob/main/Jared%20R%20Wiltshire%20Resume.pdf)
+* GitHub: [Jared R Wiltshire GitHub](https://github.com/jrichwiltshire)
