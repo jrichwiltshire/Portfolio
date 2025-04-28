@@ -10,7 +10,7 @@ This portfolio showcases a selection of my data science and analytics projects.
 
 * **Description:** Developed an interactive web application to visualize my travel photos on a map, allowing users to explore locations, view photos, and learn about my travel experiences.
 * **Technologies Used:** Python, Streamlit, Leaflet (JavaScript mapping library), SQL (for storing photo metadata)
-* **View Project:** [Travel Photo Map] (https://github.com/jrichwiltshire/Portfolio/tree/main/projects/TravelPhotoMap)
+* **View Project:** [Travel Photo Map](https://github.com/jrichwiltshire/Portfolio/tree/main/projects/TravelPhotoMap)
 
 ## Skills
 
