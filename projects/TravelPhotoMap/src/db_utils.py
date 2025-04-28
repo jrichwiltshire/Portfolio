@@ -17,18 +17,18 @@ def create_tables():
     conn = create_connection()
     if conn is not None:
         try:
-            cursor  = conn.cursor()
-            
+            cursor = conn.cursor()
+
             # Create locations table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS locations (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     location_name TEXT NOT NULL,
                     latitude REAL NOT NULL,
-                    longitude REAL NOT NULL,
+                    longitude REAL NOT NULL
                 )
             """)
-            
+
             # Create photos table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS photos (
@@ -36,7 +36,7 @@ def create_tables():
                     location_id INTEGER NOT NULL,
                     photo_url TEXT NOT NULL,
                     date_taken TEXT,
-                           description TEXT,
+                    description TEXT,
                     FOREIGN KEY (location_id) REFERENCES locations (id)
                 )
             """)
@@ -48,7 +48,7 @@ def create_tables():
         finally:
             conn.close()
     else:
-        print("Error! Cannot create the database connection.")
+        print("Could not create database connection.")
 
 if __name__ == "__main__":
     create_tables()
