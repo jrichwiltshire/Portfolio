@@ -6,8 +6,15 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "geopy>=2.4.1",
+    "matplotlib>=3.10.3",
     "pandas>=2.2.3",
     "python-dotenv>=1.1.0",
+    "scikit-learn>=1.6.1",
     "streamlit>=1.44.1",
     "streamlit-folium>=0.25.0",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=6.29.5",
 ]
