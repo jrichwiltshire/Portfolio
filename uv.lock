@@ -25,6 +25,15 @@ wheels = [
 ]
 
 [[package]]
+name = "appdirs"
+version = "1.4.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d7/d8/05696357e0311f5b5c316d7b95f46c669dd9c15aaeecbb48c7d0aeb88c40/appdirs-1.4.4.tar.gz", hash = "sha256:7d5d0167b2b1ba821647616af46a749d1c653740dd0d2415100fe26e27afdf41", size = 13470, upload-time = "2020-05-11T07:59:51.037Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3b/00/2344469e2084fb287c2e0b57b72910309874c3245463acd6cf5e3db69324/appdirs-1.4.4-py2.py3-none-any.whl", hash = "sha256:a841dacd6b99318a741b166adb07e19ee71a274450e68237b4650ca1055ab128", size = 9566, upload-time = "2020-05-11T07:59:49.499Z" },
+]
+
+[[package]]
 name = "appnope"
 version = "0.1.4"
 source = { registry = "https://pypi.org/simple" }
@@ -820,6 +829,7 @@ dependencies = [
     { name = "geopy" },
     { name = "matplotlib" },
     { name = "pandas" },
+    { name = "pygris" },
     { name = "python-dotenv" },
     { name = "scikit-learn" },
     { name = "streamlit" },
@@ -836,6 +846,7 @@ requires-dist = [
     { name = "geopy", specifier = ">=2.4.1" },
     { name = "matplotlib", specifier = ">=3.10.3" },
     { name = "pandas", specifier = ">=2.2.3" },
+    { name = "pygris", specifier = ">=0.2.0" },
     { name = "python-dotenv", specifier = ">=1.1.0" },
     { name = "scikit-learn", specifier = ">=1.6.1" },
     { name = "streamlit", specifier = ">=1.44.1" },
@@ -959,6 +970,20 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/7c/2d/c3338d48ea6cc0feb8446d8e6937e1408088a72a39937982cc6111d17f84/pygments-2.19.1.tar.gz", hash = "sha256:61c16d2a8576dc0649d9f39e089b5f02bcd27fba10d8fb4dcc28173f7a45151f", size = 4968581, upload-time = "2025-01-06T17:26:30.443Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8a/0b/9fcc47d19c48b59121088dd6da2488a49d5f72dacf8262e2790a1d2c7d15/pygments-2.19.1-py3-none-any.whl", hash = "sha256:9ea1544ad55cecf4b8242fab6dd35a93bbce657034b0611ee383099054ab6d8c", size = 1225293, upload-time = "2025-01-06T17:26:25.553Z" },
+]
+
+[[package]]
+name = "pygris"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "appdirs" },
+    { name = "geopandas" },
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/50/f1/fd2adba6ca9ef4b3d79848271a6283a35dc2e50cc2fdca3d66ae5e3cb13c/pygris-0.2.0.tar.gz", hash = "sha256:4108dabe68a2b71a10250694a41ae86680f2ad1f9655bad4f6bc8f27fcb45415", size = 51340, upload-time = "2025-04-21T16:04:54.021Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/01/9c/68deb5e1b4156b5bb1d3b02c35afa4ec4f500f1f149df8ce37847bbb897f/pygris-0.2.0-py3-none-any.whl", hash = "sha256:c58e1ea19df651bdd5a59f1f72eff231bfebcce26aba3ea29f46a334bba0d8a9", size = 57523, upload-time = "2025-04-21T16:04:51.581Z" },
 ]
 
 [[package]]
