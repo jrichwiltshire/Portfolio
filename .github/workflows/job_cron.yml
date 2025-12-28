@@ -22,11 +22,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r projects/JobSearchAggregator/requirements.txt
 
-      - name: Migrate Database Column
-        run: |
-          cd projects/JobSearchAggregator
-          sqlite3 job_aggregator.db "ALTER TABLE jobs ADD COLUMN applied INTEGER DEFAULT 0;" || echo "Column already exists"
-
       - name: Run job search
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
