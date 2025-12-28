@@ -1,0 +1,37 @@
+name: Hourly Job Search
+
+on:
+  schedule:
+    - cron: '0 * * * *' # Runs every hour on the dot
+  workflow_dispatch: # Allows you to run it manually from the Github UI
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests python-dotenv
+
+      - name: Run job search
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python main.py
+
+      - name: Commit changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "Github Action"
+          git add job_aggregator.db
+          git commit -m "Update job database [skip ci]" || echo "No changes to commit"
+          git push
+          
