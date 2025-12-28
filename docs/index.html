@@ -1,0 +1,13 @@
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const jobId = params.get('id');
+  const WORKER_URL = "job-tracker-proxy.jared-r-wiltshire.workers.dev";
+
+  if (jobId) {
+    // We call our SECURE Cloudflare Worker instead of GitHub directly
+    fetch(`${WORKER_URL}?id=${jobId}`)
+      .then(res => {
+        document.getElementById('status').innerText = "✅ Request sent to Cloudflare. GitHub Action triggered!";
+      });
+  }
+</script>
