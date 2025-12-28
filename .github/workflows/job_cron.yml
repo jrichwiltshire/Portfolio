@@ -25,6 +25,7 @@ jobs:
       - name: Run job search
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           cd projects/JobSearchAggregator
           python main.py
