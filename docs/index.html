@@ -27,12 +27,20 @@
     const WORKER_URL = "https://job-tracker-proxy.jared-r-wiltshire.workers.dev";
   
     if (jobId) {
-      // We call our SECURE Cloudflare Worker instead of GitHub directly
-      fetch(`${WORKER_URL}?id=${jobId}`)
-        .then(res => {
-          document.getElementById('status').innerText = "✅ Request sent to Cloudflare. GitHub Action triggered!";
-        });
-    }
+    // Show the spinner while waiting for the Worker
+    document.getElementById('loader').style.display = "block";
+    document.getElementById('status').innerText = "Syncing with database...";
+
+    fetch(`${WORKER_URL}?id=${jobId}`)
+      .then(res => {
+        document.getElementById('loader').style.display = "none"; // Hide spinner
+        document.getElementById('status').innerText = "✅ Request sent to Cloudflare. GitHub Action triggered!";
+      })
+      .catch(err => {
+        document.getElementById('loader').style.display = "none";
+        document.getElementById('status').innerText = "❌ Connection Error.";
+      });
+  }
   </script>
 </body>
 </html>
