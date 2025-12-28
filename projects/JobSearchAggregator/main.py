@@ -8,6 +8,7 @@ import os
 import openai
 import json
 from dotenv import load_dotenv
+from bs4 import BeautifulSoup
 
 load_dotenv()
 
@@ -48,7 +49,8 @@ class JobDatabase:
             description TEXT,
             posted_date TEXT,
             min_salary INTEGER,
-            max_salary INTEGER
+            max_salary INTEGER,
+            applied INTEGER DEFAULT 0 -- 0 = No, 1 = Yes
         )
         """
         self.conn.execute(query)
@@ -98,11 +100,15 @@ def calculate_fit_score(job_description, resume_text):
     """Uses AI to compare the job to your resume."""
     client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+    truncated_desc = (
+        job_description[:12000] if job_description else "No description provided."
+    )
+
     prompt = f"""
     You are an expert career coach. Compare the following Resume and Job Description.
 
     Resume: {resume_text}
-    Job Description: {job_description}
+    Job Description: {truncated_desc}
 
     Return ONLY a JSON object with:
     1. "score": An integer from 1 to 10.
@@ -119,6 +125,80 @@ def calculate_fit_score(job_description, resume_text):
     except Exception as e:
         print(f"AI Scoring Error: {e}")
         return None
+
+
+def send_notification(job: JobListing, fit_data: dict):
+    webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
+
+    # Choose a color based on score: Green for 9-10, Yellow for 7-8
+    color = 5025616 if fit_data["score"] >= 9 else 16776960
+
+    base_url = "https://jrichwiltshire.github.io/Portfolio"
+    apply_url = f"{base_url}?id={job.external_id}"
+
+    payload = {
+        "embeds": [
+            {
+                "title": f"🎯 Fit Score: {fit_data['score']}/10 - {job.title}",
+                "url": job.link,
+                "description": (
+                    f"**Company:** {job.company}\n"
+                    f"**Location:** {job.location}\n\n"
+                    f"**AI Analysis:** {fit_data['reason']}\n\n"
+                    f"📝 [Mark as Applied]({apply_url})"
+                ),
+                "color": color,
+                "footer": {"text": f"Source: {job.source} | ID: {job.external_id}"},
+            }
+        ],
+    }
+    requests.post(webhook_url, json=payload)
+
+
+def optimize_search_queries(db_path="job_aggregator.db"):
+    """Analyzes high-scoring jobs to suggest better search terms."""
+    conn = sqlite3.connect(db_path)
+    # Get title of jobs that had high match scores in previous runs
+    cursor = conn.execute(
+        "SELECT title FROM jobs WHERE applied = 1 OR description LIKE '%Score: 9%' LIMIT 10"
+    )
+    past_titles = [row[0] for row in cursor.fetchall()]
+    conn.close()
+
+    if not past_titles:
+        return [
+            "Data Analyst",
+            "Data Scientist",
+            "Analytics",
+            "Machine Learning",
+            "BI Developer",
+        ]
+
+    client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    prompt = f"""
+    Based on these job titles I liked: {past_titles}
+    Identify the top 5 most effective 'Search Keywords' I should use on job boards to find simliar high-paying roles in Austin.
+    Return ONLY a JSON list of strings.
+    """
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+        )
+        new_keywords = json.loads(response.choices[0].message.content).get(
+            "keywords", []
+        )
+        return new_keywords
+    except:
+        return [
+            "Data Analyst",
+            "Data Scientist",
+            "Analytics",
+            "Machine Learning",
+            "BI Developer",
+        ]
 
 
 # --- 4. FETCHERS ---
@@ -166,41 +246,38 @@ def fetch_arbeitnow(search_keywords, city_filter, min_salary=0):
 
 def fetch_built_in_austin(keywords, city_filter, min_salary=0):
     """Fetcher for Built In Austin (Scraping/API hybrid approach)"""
-    print(f"Checking Built In Austin for {keywords}...")
-    url = "https://www.builtinaustin.com/jobs/data-analytics"
+    categories = ["data-analytics", "data-science"]
+    headers = {"User-Agent": "Mozilla/5.0"}
     found_jobs = []
 
-    try:
-        res = requests.get(url)
-        data = res.json()
+    for cat in categories:
+        print(f"Checking Built In Austin: {cat}...")
+        url = f"https://www.builtinaustin.com/jobs/{cat}"
 
-        for item in data[1:]:  # data[0] is often a legal/disclaimer object, skip it
-            title = item.get("position", "").lower()
-            tags = [t.lower() for t in item.get("tags", [])]
+        try:
+            res = requests.get(url, headers=headers)
+            soup = BeautifulSoup(res.text, "html.parser")
 
-            if any(k.lower() in title for k in keywords):
-                # Salary check
-                salary = item.get("salary_min") or extract_salary(
-                    item.get("description", "")
-                )
-                if salary and salary < min_salary:
-                    continue
+            job_cards = soup.find_all("div", {"data-id": "job-card"})
+            for card in job_cards:
+                title = card.find("h2").text.strip()
+                if any(k.lower() in title.lower() for k in keywords):
+                    company = card.find("div", {"class": "company-name"}).text.strip()
+                    link = "https://www.builtinaustin.com" + card.find("a")["href"]
 
-                job = JobListing(
-                    source="RemoteOK",
-                    external_id=f"rok-{item['id']}",
-                    title=item["position"],
-                    company=item["company"],
-                    location="Remote",
-                    link=item["url"],
-                    description=item["description"],
-                    posted_date=datetime.now().strftime("%Y-%m-%d"),
-                    min_salary=salary,
-                    max_salary=item.get("salary_max"),
-                )
-                found_jobs.append(job)
-    except Exception as e:
-        print(f"Error fetching from RemoteOK: {e}")
+                    job = JobListing(
+                        source="BuiltInAustin",
+                        external_id=f"bia-{hash(link)}",
+                        title=title,
+                        company=company,
+                        location="Austin, TX",
+                        link=link,
+                        description="Visit link for full description...",
+                        posted_date=datetime.now().strftime("%Y-%m-%d"),
+                    )
+                    found_jobs.append(job)
+        except Exception as e:
+            print(f"Error fetching from BuiltInAustin: {e}")
     return found_jobs
 
 
@@ -230,10 +307,10 @@ def fetch_remote_ok(keywords, city_filter, min_salary=0):
 
                 job = JobListing(
                     source="RemoteOK",
-                    external_id=f"bia-{item['id']}",
+                    external_id=f"rok-{item['id']}",
                     title=item["position"],
                     company=item["company"],
-                    location="Austin",
+                    location="Remote",
                     link=item["url"],
                     description=item["description"],
                     posted_date=datetime.now().strftime("%Y-%m-%d"),
@@ -246,23 +323,38 @@ def fetch_remote_ok(keywords, city_filter, min_salary=0):
     return found_jobs
 
 
-def send_notification(job: JobListing, fit_data: dict):
-    webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
+def fetch_greenhouse_companies(keywords, city_filter, min_salary=0):
+    """Fetcher for companies using Greenhouse (e.g., DoorDash, Stripe, etc.)"""
+    target_companies = ["doordash", "stripe", "canva", "crunchyroll"]
+    found_jobs = []
 
-    # Choose a color based on score: Green for 9-10, Yellow for 7-8
-    color = 5025616 if fit_data["score"] >= 9 else 16776960
+    for co in target_companies:
+        print(f"Checking Greenhouse board for {co}...")
+        url = f"https://boards-api.greenhouse.io/v1/boards/{co}/jobs"
+        try:
+            res = requests.get(url).json()
+            for item in res.get("jobs", []):
+                title = item["title"].lower()
+                location = item.get("location", {}).get("name", "").lower()
 
-    payload = {
-        "embeds": [
-            {
-                "title": f"🎯 Fit Score: {fit_data['score']}/10 - {job.title}",
-                "url": job.link,
-                "description": f"**Company:** {job.company}\n**Location:** {job.location}\n\n**AI Analysis:** {fit_data['reason']}",
-                "color": color,
-            }
-        ],
-    }
-    requests.post(webhook_url, json=payload)
+                if (
+                    any(k.lower() in title for k in keywords)
+                    and city_filter.lower() in location
+                ):
+                    job = JobListing(
+                        source=f"Greehouse-{co}",
+                        external_id=f"gh-{item["id"]}",
+                        title=item["title"],
+                        company=co.capitalize(),
+                        location=item.get("location", {}).get("name"),
+                        link=item["absolute_url"],
+                        description="View Greenhouse for details",
+                        posted_date=datetime.now().strftime("%Y-%m-%d"),
+                    )
+                    found_jobs.append(job)
+        except:
+            continue
+    return found_jobs
 
 
 # --- 3. THE "WORKER" (MAIN EXECUTION) ---
@@ -272,8 +364,11 @@ if __name__ == "__main__":
     fetchers = [
         fetch_arbeitnow,
         fetch_remote_ok,
-        # fetch_built_in_austin
+        fetch_built_in_austin,
+        fetch_greenhouse_companies,
     ]
+
+    optimized_keywords = optimize_search_queries()
 
     # 1. Define focus areas
     SETTINGS = {
@@ -287,6 +382,8 @@ if __name__ == "__main__":
         "city": "Austin",
         "min_salary": 160000,
     }
+
+    SETTINGS["keywords"] = list(set(SETTINGS["keywords"] + optimized_keywords))
 
     new_jobs_found = 0
     for fetch_func in fetchers:
