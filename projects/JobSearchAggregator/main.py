@@ -63,7 +63,7 @@ class JobDatabase:
 
     def upsert_job(self, job: JobListing):
         """Inserts a job, or ignores it if the external_id already exists."""
-        query = "INSERT OR IGNORE INTO jobs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        query = "INSERT OR IGNORE INTO jobs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         self.conn.execute(
             query,
             (
@@ -77,6 +77,7 @@ class JobDatabase:
                 job.posted_date,
                 job.min_salary,
                 job.max_salary,
+                0,
             ),
         )
         self.conn.commit()
@@ -260,22 +261,30 @@ def fetch_built_in_austin(keywords, city_filter, min_salary=0):
 
             job_cards = soup.find_all("div", {"data-id": "job-card"})
             for card in job_cards:
-                title = card.find("h2").text.strip()
-                if any(k.lower() in title.lower() for k in keywords):
-                    company = card.find("div", {"class": "company-name"}).text.strip()
-                    link = "https://www.builtinaustin.com" + card.find("a")["href"]
+                title_el = card.find("h2")
+                company_el = card.find("div", {"class": "company-name"})
 
-                    job = JobListing(
-                        source="BuiltInAustin",
-                        external_id=f"bia-{hash(link)}",
-                        title=title,
-                        company=company,
-                        location="Austin, TX",
-                        link=link,
-                        description="Visit link for full description...",
-                        posted_date=datetime.now().strftime("%Y-%m-%d"),
-                    )
-                    found_jobs.append(job)
+                # Check if elements were found
+                if title_el and company_el:
+                    title = title_el.text.strip()
+                    company = company_el.text.strip()
+                    if any(k.lower() in title.lower() for k in keywords):
+                        company = card.find(
+                            "div", {"class": "company-name"}
+                        ).text.strip()
+                        link = "https://www.builtinaustin.com" + card.find("a")["href"]
+
+                        job = JobListing(
+                            source="BuiltInAustin",
+                            external_id=f"bia-{hash(link)}",
+                            title=title,
+                            company=company,
+                            location="Austin, TX",
+                            link=link,
+                            description="Visit link for full description...",
+                            posted_date=datetime.now().strftime("%Y-%m-%d"),
+                        )
+                        found_jobs.append(job)
         except Exception as e:
             print(f"Error fetching from BuiltInAustin: {e}")
     return found_jobs
@@ -380,7 +389,7 @@ if __name__ == "__main__":
             "BI Developer",
         ],
         "city": "Austin",
-        "min_salary": 160000,
+        "min_salary": 0,
     }
 
     SETTINGS["keywords"] = list(set(SETTINGS["keywords"] + optimized_keywords))
