@@ -30,6 +30,7 @@ jobs:
           ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
         run: |
           cd projects/JobSearchAggregator
+          mkdir -p ../../docs
           python main.py
 
       - name: Commit changes
