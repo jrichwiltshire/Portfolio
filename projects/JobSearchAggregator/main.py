@@ -431,7 +431,7 @@ def fetch_adzuna(keywords, city_filter, min_salary=0):
 
 # --- 3. THE "WORKER" (MAIN EXECUTION) ---
 if __name__ == "__main__":
-    db = JobDatabase(db_name="docs/job_aggregator.db")
+    db = JobDatabase(db_name="../../docs/job_aggregator.db")
 
     fetchers = [
         fetch_arbeitnow,
