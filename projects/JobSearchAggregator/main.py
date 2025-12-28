@@ -343,7 +343,7 @@ def fetch_greenhouse_companies(keywords, city_filter, min_salary=0):
                 ):
                     job = JobListing(
                         source=f"Greehouse-{co}",
-                        external_id=f"gh-{item["id"]}",
+                        external_id=f"gh-{item['id']}",
                         title=item["title"],
                         company=co.capitalize(),
                         location=item.get("location", {}).get("name"),
