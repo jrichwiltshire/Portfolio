@@ -62,7 +62,7 @@
         async function init() {
             try {
                 const SQL = await initSqlJs({ locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${file}` });
-                const response = await fetch('projects/JobSearchAggregator/job_aggregator.db');
+                const response = await fetch('job_aggregator.db');
                 const buf = await response.arrayBuffer();
                 db = new SQL.Database(new Uint8Array(buf));
                 
