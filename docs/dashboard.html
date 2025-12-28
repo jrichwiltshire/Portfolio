@@ -60,7 +60,7 @@
 
                 // 2. Fetch your database file
                 // Path must match where your DB is relative to this HTML file
-                const response = await fetch('job_aggregator.db');
+                const response = await fetch('projects/JobSearchAggregator/job_aggregator.db');
                 const buf = await response.arrayBuffer();
                 const db = new SQL.Database(new Uint8Array(buf));
 
