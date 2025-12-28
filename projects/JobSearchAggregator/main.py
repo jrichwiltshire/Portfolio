@@ -259,32 +259,39 @@ def fetch_built_in_austin(keywords, city_filter, min_salary=0):
             res = requests.get(url, headers=headers)
             soup = BeautifulSoup(res.text, "html.parser")
 
-            job_cards = soup.find_all("div", {"data-id": "job-card"})
+            job_cards = soup.select('div[data-id="job-card"]')
             for card in job_cards:
-                title_el = card.find("h2")
-                company_el = card.find("div", {"class": "company-name"})
+                try:
+                    # Use .select_one and check existence to avoid NoneType errors
+                    title_el = card.select_one("h2")
+                    company_el = card.select_one("div.company-name")
+                    link_el = card.select_one('a[data-id="job-card-title"]')
+                    # Check if elements were found
+                    if title_el and company_el:
+                        title = title_el.text.strip()
+                        company = company_el.text.strip()
+                        if any(k.lower() in title.lower() for k in keywords):
+                            company = card.find(
+                                "div", {"class": "company-name"}
+                            ).text.strip()
+                            link = (
+                                "https://www.builtinaustin.com" + card.find("a")["href"]
+                            )
 
-                # Check if elements were found
-                if title_el and company_el:
-                    title = title_el.text.strip()
-                    company = company_el.text.strip()
-                    if any(k.lower() in title.lower() for k in keywords):
-                        company = card.find(
-                            "div", {"class": "company-name"}
-                        ).text.strip()
-                        link = "https://www.builtinaustin.com" + card.find("a")["href"]
+                            job = JobListing(
+                                source="BuiltInAustin",
+                                external_id=f"bia-{hash(link)}",
+                                title=title,
+                                company=company,
+                                location="Austin, TX",
+                                link=link,
+                                description="Visit link for full description...",
+                                posted_date=datetime.now().strftime("%Y-%m-%d"),
+                            )
+                            found_jobs.append(job)
 
-                        job = JobListing(
-                            source="BuiltInAustin",
-                            external_id=f"bia-{hash(link)}",
-                            title=title,
-                            company=company,
-                            location="Austin, TX",
-                            link=link,
-                            description="Visit link for full description...",
-                            posted_date=datetime.now().strftime("%Y-%m-%d"),
-                        )
-                        found_jobs.append(job)
+                except Exception as e:
+                    continue  # Skip one bad card rather than crashing the whole fetcher
         except Exception as e:
             print(f"Error fetching from BuiltInAustin: {e}")
     return found_jobs
@@ -334,7 +341,28 @@ def fetch_remote_ok(keywords, city_filter, min_salary=0):
 
 def fetch_greenhouse_companies(keywords, city_filter, min_salary=0):
     """Fetcher for companies using Greenhouse (e.g., DoorDash, Stripe, etc.)"""
-    target_companies = ["doordash", "stripe", "canva", "crunchyroll"]
+    target_companies = [
+        "crowdstrike",
+        "cloudflare",
+        "roblox",
+        "atlassian",
+        "anaconda",
+        "pivotalsoftware",
+        "alertmedia",
+        "digitalocean",
+        "confluent",
+        "databricks",
+        "snowflake",
+        "mongodb",
+        "elastic",
+        "hashicorp",
+        "fivetran",
+        "dbtlabs",
+        "unity",
+        "discord",
+        "figma",
+        "notion",
+    ]
     found_jobs = []
 
     for co in target_companies:
@@ -366,6 +394,41 @@ def fetch_greenhouse_companies(keywords, city_filter, min_salary=0):
     return found_jobs
 
 
+def fetch_adzuna(keywords, city_filter, min_salary=0):
+    APP_ID = os.getenv("ADZUNA_APP_ID")
+    APP_KEY = os.getenv("ADZUNA_APP_KEY")
+    found_jobs = []
+
+    # Adzuna uses space-separated keywords
+    query = "%20".join(keywords)
+    url = f"https://api.adzuna.com/v1/api/jobs/us/search/1?app_id={APP_ID}&app_key={APP_KEY}&results_per_page=20&what={query}&where={city_filter}"
+
+    try:
+        res = requests.get(url).json()
+        for item in res.get("results", []):
+            # Adzuna gives us salary directly!
+            salary = item.get("salary_min", 0)
+            if salary and salary < min_salary:
+                continue
+
+            job = JobListing(
+                source="Adzuna",
+                external_id=f"adz-{item['id']}",
+                title=item["title"],
+                company=item["company"]["display_name"],
+                location=item["location"]["display_name"],
+                link=item["redirect_url"],
+                description=item["description"],
+                posted_date=item["created"],
+                min_salary=salary,
+                max_salary=item.get("salary_max"),
+            )
+            found_jobs.append(job)
+    except Exception as e:
+        print(f"Adzuna Error: {e}")
+    return found_jobs
+
+
 # --- 3. THE "WORKER" (MAIN EXECUTION) ---
 if __name__ == "__main__":
     db = JobDatabase()
@@ -375,6 +438,7 @@ if __name__ == "__main__":
         fetch_remote_ok,
         fetch_built_in_austin,
         fetch_greenhouse_companies,
+        fetch_adzuna,
     ]
 
     optimized_keywords = optimize_search_queries()
