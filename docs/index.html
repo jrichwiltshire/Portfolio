@@ -1,7 +1,7 @@
 <script>
   const params = new URLSearchParams(window.location.search);
   const jobId = params.get('id');
-  const WORKER_URL = "job-tracker-proxy.jared-r-wiltshire.workers.dev";
+  const WORKER_URL = "https://job-tracker-proxy.jared-r-wiltshire.workers.dev";
 
   if (jobId) {
     // We call our SECURE Cloudflare Worker instead of GitHub directly
