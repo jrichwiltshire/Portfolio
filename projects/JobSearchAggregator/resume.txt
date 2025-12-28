@@ -1,0 +1,49 @@
+﻿Jared Richard Wiltshire 
+jared.r.wiltshire@gmail.com
+(817) 602-3523
+Austin, TX
+
+
+PROFESSIONAL SUMMARY
+Data Scientist specializing in Product Analytics with 10+ years driving product growth through machine learning, quantitative analysis, and advanced analytics. Proven track record influencing $5.6M+ in product revenue through data-driven feature recommendations and conversion optimization (21% improvement). Technical expertise in building production ML systems (Python, SQL, GCP) that improve user engagement, reduce churn, and optimize product funnels through statistical analysis. Skilled at translating complex analytical insights into actionable product strategy for C-suite, Engineering, and Product teams while managing high-volume data environments (1B+ monthly records) and leading cross-functional analytics teams.
+PRODUCT IMPACT HIGHLIGHTS
+* Influenced $5.6M+ in product revenue through data-driven feature recommendations
+* Optimized product conversion funnel via ML lead scoring (21% improvement)
+* Identified user behavioral segments driving product adoption (13% engagement lift)
+* Reduced customer churn through predictive analytics and intervention system
+* Presented product performance insights to C-suite weekly, shaping product strategy
+SKILLS 
+* Product Analytics: User Behavior Analysis, Conversion Funnel Optimization, Customer Segmentation, Cohort Analysis, Product Metrics, Product Development Strategy, Product Roadmap Influence
+* Statistics & Quantitative Analysis: Statistical Modeling, Hypothesis Testing, Quantitative Analysis, Forecasting, Predictive Analytics, Statistical Inference
+* Data Science & ML: Predictive Modeling, Classification (Logistic Regression, Gradient Boosting, XGBoost), Clustering (KMeans, Agglomerative), Random Forests, Feature Engineering, Statistical Modeling
+* AI/LLM: Claude Code CLI, Gemini, Claude Code agents, GenAI
+* Programming Languages: Python (NumPy, Pandas, Polars, GCloud, Scikit-learn, Matplotlib), SQL, LookML, HTML/CSS
+* Cloud Platforms: Google Cloud Platform (BigQuery, Pub/Sub, App Engine, VertexAI, Cloud Run, Dataform), dbt, Docker
+* Data Visualization: Looker, Tableau
+* Data Engineering: ETL Pipeline Development, Data Warehousing, Data Governance
+* Other: Version Control (GitHub), Marketing Funnel Analysis, CAC, LTV, ROAS
+
+
+WORK EXPERIENCE 
+Auctane LLC | Apr 2021 – Present |Senior Data Analyst II (Data Scientist) | Austin, TX
+Consistently delivered high-impact analytical solutions, driving swift progression from Senior Business Analyst to Senior Data Analyst II. Team Lead for 11-member analytics team including four senior analysts and five junior analysts.
+* Built predictive churn model using Python and scikit-learn, deployed via GCP Cloud Run, enabling proactive user retention interventions through early-warning system integrated with product and support workflows, reducing at-risk customer churn
+* Developed ML-powered lead scoring system using Logistic Regression and Gradient Boosting that optimized product conversion funnel, achieving 21% increase in conversion rates and directly informing product team's onboarding optimization strategy; deployed via Cloud Run with real-time Segment integration
+* Created user segmentation models using KMeans clustering to analyze behavioral patterns and identify distinct user personas, driving 13% improvement in feature adoption and directly informing product roadmap prioritization for 2024-2025
+* Drove product development and product strategy through weekly executive presentations of quantitative analysis, user behavior insights, and product performance metrics, directly resulting in feature launches that generated $5.6M in new revenue
+* Streamlined data transformation, version control, and storage processes by pioneering development and maintenance of database structures using dbt, GitHub, LookML, and BigQuery, improving analyst productivity by 15 hours weekly
+* Improved Looker dashboard load times by 80% by architecting ETL pipelines that optimized data loading to newly created analytical tables, enhancing self-service analytics capabilities for product and marketing teams
+* Designed and implemented a Python-based geospatial solution using agglomerative clustering and statistical modeling to optimize 35 sales regions, creating an interactive map and data warehouse tables, improving territory management and streamlining hiring decisions supporting the 2025 company growth plan
+* Applied technical expertise in data engineering and software development to architect full-stack analytical solutions, bridging ML model development with production deployment across GCP infrastructure
+* Managed a development Google Cloud Platform (GCP) project, including creating service accounts, controlling access, and building full-scale applications utilized by other departments; responsible for analyzing data within multiple schemas in a database with over a billion records written monthly
+Arizona Department of Economic Security | Jan 2016 - Apr 2021 | Managing Analyst | Phoenix, AZ
+Accelerated career progression from Financial Analyst to Managing Analyst, demonstrating consistent high performance
+* Optimized $55M annual federal funding allocation using SQL, Python, Excel, and Tableau through quantitative analysis and statistical modeling, resulting in 60% increase in daycare reimbursement rates and enabling 14,000 waitlisted children to access high-quality childcare services
+* Directed team of three analysts, enhancing team performance and increasing reporting output by 66% through effective task delegation, report management, mentorship, and training initiatives in SQL and data visualization
+* Engineered strategic financial forecasts and policy proposals using statistical analysis and forecasting techniques, presented monthly to executive leadership, resulting in $23M annual reduction in outlays and optimized fund management
+* Formulated a comprehensive quarterly scorecard using SQL, Tableau, and Excel, evaluating 600+ providers on performance metrics, enhancing program transparency and  information access via agency website
+The Vanguard Group | Aug 2014 - Dec 2015 | Investment Professional | Scottsdale, AZ
+
+
+EDUCATION 
+University of Central Florida | May 2014 | BS, Finance | Orlando, FL

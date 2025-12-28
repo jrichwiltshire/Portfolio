@@ -5,9 +5,14 @@ import sqlite3
 import requests
 import re
 import os
+import openai
+import json
 from dotenv import load_dotenv
 
 load_dotenv()
+
+with open("resume.txt", "r") as f:
+    MY_RESUME = f.read()
 
 
 # --- 1. DATA MODEL ---
@@ -49,6 +54,11 @@ class JobDatabase:
         self.conn.execute(query)
         self.conn.commit()
 
+    def job_exists(self, external_id):
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT 1 FROM jobs WHERE external_id = ?", (external_id,))
+        return cursor.fetchone() is not None
+
     def upsert_job(self, job: JobListing):
         """Inserts a job, or ignores it if the external_id already exists."""
         query = "INSERT OR IGNORE INTO jobs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
@@ -84,14 +94,42 @@ def extract_salary(description):
     return None
 
 
+def calculate_fit_score(job_description, resume_text):
+    """Uses AI to compare the job to your resume."""
+    client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+    prompt = f"""
+    You are an expert career coach. Compare the following Resume and Job Description.
+
+    Resume: {resume_text}
+    Job Description: {job_description}
+
+    Return ONLY a JSON object with:
+    1. "score": An integer from 1 to 10.
+    2. "reason": A one-sentence explanation of why it fits or doesn't.
+    """
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+        )
+        return json.loads(response.choices[0].message.content)
+    except Exception as e:
+        print(f"AI Scoring Error: {e}")
+        return None
+
+
 # --- 4. FETCHERS ---
-def fetch_jobs_from_all_sources(search_keywords, city_filter, min_salary=0):
+def fetch_arbeitnow(search_keywords, city_filter, min_salary=0):
     print(f"Searching Arbeitnow for {search_keywords} in {city_filter}...")
+    url = "https://www.arbeitnow.com/api/job-board-api"
     all_found_jobs = []
 
     # --- Source 1. Arbeitnow ---
     try:
-        res = requests.get("https://www.arbeitnow.com/api/job-board-api")
+        res = requests.get(url)
         data = res.json().get("data", [])
         for item in data:
             title = item["title"].lower()
@@ -126,20 +164,101 @@ def fetch_jobs_from_all_sources(search_keywords, city_filter, min_salary=0):
     return all_found_jobs
 
 
-def send_notification(job: JobListing):
+def fetch_built_in_austin(keywords, city_filter, min_salary=0):
+    """Fetcher for Built In Austin (Scraping/API hybrid approach)"""
+    print(f"Checking Built In Austin for {keywords}...")
+    url = "https://www.builtinaustin.com/jobs/data-analytics"
+    found_jobs = []
+
+    try:
+        res = requests.get(url)
+        data = res.json()
+
+        for item in data[1:]:  # data[0] is often a legal/disclaimer object, skip it
+            title = item.get("position", "").lower()
+            tags = [t.lower() for t in item.get("tags", [])]
+
+            if any(k.lower() in title for k in keywords):
+                # Salary check
+                salary = item.get("salary_min") or extract_salary(
+                    item.get("description", "")
+                )
+                if salary and salary < min_salary:
+                    continue
+
+                job = JobListing(
+                    source="RemoteOK",
+                    external_id=f"rok-{item['id']}",
+                    title=item["position"],
+                    company=item["company"],
+                    location="Remote",
+                    link=item["url"],
+                    description=item["description"],
+                    posted_date=datetime.now().strftime("%Y-%m-%d"),
+                    min_salary=salary,
+                    max_salary=item.get("salary_max"),
+                )
+                found_jobs.append(job)
+    except Exception as e:
+        print(f"Error fetching from RemoteOK: {e}")
+    return found_jobs
+
+
+def fetch_remote_ok(keywords, city_filter, min_salary=0):
+    """Fetcher for RemoteOK (Great for Data Science Roles)"""
+    print(f"Checking RemoteOK for {keywords}...")
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebkit/537.36"
+    }
+    url = "https://remoteok.com/api"
+    found_jobs = []
+
+    try:
+        res = requests.get(url, headers=headers)
+        data = res.json()
+
+        for item in data[1:]:  # data[0] is often a legal/disclaimer object, skip it
+            title = item.get("position", "").lower()
+
+            if any(k.lower() in title for k in keywords):
+                # Salary check
+                salary = item.get("salary_min") or extract_salary(
+                    item.get("description", "")
+                )
+                if salary and salary < min_salary:
+                    continue
+
+                job = JobListing(
+                    source="RemoteOK",
+                    external_id=f"bia-{item['id']}",
+                    title=item["position"],
+                    company=item["company"],
+                    location="Austin",
+                    link=item["url"],
+                    description=item["description"],
+                    posted_date=datetime.now().strftime("%Y-%m-%d"),
+                    min_salary=salary,
+                    max_salary=item.get("salary_max"),
+                )
+                found_jobs.append(job)
+    except Exception as e:
+        print(f"Error fetching from RemoteOK: {e}")
+    return found_jobs
+
+
+def send_notification(job: JobListing, fit_data: dict):
     webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
 
-    if not webhook_url:
-        print("Error: DISCORD_WEBHOOK_URL not found in environment.")
-        return
+    # Choose a color based on score: Green for 9-10, Yellow for 7-8
+    color = 5025616 if fit_data["score"] >= 9 else 16776960
 
     payload = {
-        "content": f"🎯 **New {job.title} Role Found!**",
         "embeds": [
             {
-                "title": f"{job.company} is hiring!",
-                "description": f"📍 **Location:** {job.location}\n🔗 [Apply Here]({job.link})",
-                "color": 5814783,
+                "title": f"🎯 Fit Score: {fit_data['score']}/10 - {job.title}",
+                "url": job.link,
+                "description": f"**Company:** {job.company}\n**Location:** {job.location}\n\n**AI Analysis:** {fit_data['reason']}",
+                "color": color,
             }
         ],
     }
@@ -149,6 +268,12 @@ def send_notification(job: JobListing):
 # --- 3. THE "WORKER" (MAIN EXECUTION) ---
 if __name__ == "__main__":
     db = JobDatabase()
+
+    fetchers = [
+        fetch_arbeitnow,
+        fetch_remote_ok,
+        # fetch_built_in_austin
+    ]
 
     # 1. Define focus areas
     SETTINGS = {
@@ -163,23 +288,24 @@ if __name__ == "__main__":
         "min_salary": 160000,
     }
 
-    # 2. Fetch real jobs
-    real_jobs = fetch_jobs_from_all_sources(
-        SETTINGS["keywords"], SETTINGS["city"], SETTINGS["min_salary"]
-    )
-
     new_jobs_found = 0
-    for job in real_jobs:
-        # Check if it exists before trying to insert to track "newness"
-        cursor = db.conn.cursor()
-        cursor.execute("SELECT 1 FROM jobs WHERE external_id = ?", (job.external_id,))
-        exists = cursor.fetchone()
+    for fetch_func in fetchers:
+        try:
+            real_jobs = fetch_func(
+                SETTINGS["keywords"], SETTINGS["city"], SETTINGS["min_salary"]
+            )
 
-        if not exists:
-            db.upsert_job(job)
-            send_notification(job)
-            new_jobs_found += 1
+            for job in real_jobs:
+                if not db.job_exists(job.external_id):
+                    ai_evaluation = calculate_fit_score(job.description, MY_RESUME)
 
+                    if ai_evaluation and ai_evaluation.get("score", 0) >= 7:
+                        db.upsert_job(job)
+                        send_notification(job, ai_evaluation)
+                        new_jobs_found += 1
+
+        except Exception as e:
+            print(f"Error in {fetch_func.__name__}: {e}")
     print(
         f"Check complete. Found {new_jobs_found} new matching jobs in {SETTINGS['city']}."
     )
