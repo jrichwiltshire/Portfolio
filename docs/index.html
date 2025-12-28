@@ -1,13 +1,38 @@
-<script>
-  const params = new URLSearchParams(window.location.search);
-  const jobId = params.get('id');
-  const WORKER_URL = "https://job-tracker-proxy.jared-r-wiltshire.workers.dev";
-
-  if (jobId) {
-    // We call our SECURE Cloudflare Worker instead of GitHub directly
-    fetch(`${WORKER_URL}?id=${jobId}`)
-      .then(res => {
-        document.getElementById('status').innerText = "✅ Request sent to Cloudflare. GitHub Action triggered!";
-      });
-  }
-</script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Application Tracker | Jared Wiltshire</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f4f7f6; }
+        .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); text-align: center; max-width: 400px; }
+        h1 { color: #2c3e50; font-size: 1.5rem; margin-bottom: 1rem; }
+        p { color: #7f8c8d; line-height: 1.5; }
+        #status { font-weight: bold; color: #3498db; margin-top: 1rem; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 1rem auto; display: none; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+  <div class="card">
+      <h1>Job Search Automation</h1>
+      <p id="description">This page is part of an automated pipeline that tracks job applications and updates a personal SQLite database via GitHub Actions.</p>
+      <div id="loader" class="loader"></div>
+      <p id="status">Waiting for Job ID...</p>
+  </div>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const jobId = params.get('id');
+    const WORKER_URL = "https://job-tracker-proxy.jared-r-wiltshire.workers.dev";
+  
+    if (jobId) {
+      // We call our SECURE Cloudflare Worker instead of GitHub directly
+      fetch(`${WORKER_URL}?id=${jobId}`)
+        .then(res => {
+          document.getElementById('status').innerText = "✅ Request sent to Cloudflare. GitHub Action triggered!";
+        });
+    }
+  </script>
+</body>
+</html>
