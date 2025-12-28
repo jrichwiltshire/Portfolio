@@ -36,7 +36,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "Github Action"
-          git add -f projects/JobSearchAggregator/job_aggregator.db
+          git add -f docs/job_aggregator.db
           git commit -m "Update job database [skip ci]" || echo "No changes to commit"
           git push
           
