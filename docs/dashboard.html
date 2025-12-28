@@ -3,43 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Job Search Dashboard | Jared Wiltshire</title>
+    <title>Job Dashboard | Jared Wiltshire</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.min.css">
     <style>
-        body { max-width: 1000px; margin: auto; padding: 20px; }
+        body { max-width: 1100px; margin: auto; padding: 20px; }
+        .controls { background: #f0f4f8; padding: 20px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap; }
+        .control-group { display: flex; flex-direction: column; gap: 5px; }
+        input[type="text"], input[type="range"] { width: 250px; }
         .stats { display: flex; gap: 20px; margin-bottom: 20px; }
-        .stat-card { background: #f4f7f6; padding: 15px; border-radius: 8px; flex: 1; text-align: center; }
-        table { width: 100%; border-collapse: collapse; }
-        th { background-color: #3498db; color: white; }
-        .applied-tag { color: green; font-weight: bold; }
-        .new-tag { color: #3498db; }
+        .stat-card { background: #e1f5fe; padding: 15px; border-radius: 8px; flex: 1; text-align: center; border: 1px solid #b3e5fc; }
+        .applied-tag { color: white; background: #27ae60; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; }
+        .new-tag { color: white; background: #3498db; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; }
+        tr:hover { background-color: #f9f9f9; }
     </style>
 </head>
 <body>
-    <h1>Job Search Automation Dashboard</h1>
-    <p>Live data from <code>job_aggregator.db</code>, updated hourly via GitHub Actions.</p>
-
+    <h1>Job Search Automation</h1>
+    
     <div class="stats">
-        <div class="stat-card">
-            <h2 id="total-jobs">-</h2>
-            <p>Total Opportunities</p>
-        </div>
-        <div class="stat-card">
-            <h2 id="applied-count">-</h2>
-            <p>Applications Sent</p>
-        </div>
+        <div class="stat-card"><h3><span id="total-jobs">0</span></h3><p>Total Opportunities</p></div>
+        <div class="stat-card"><h3><span id="applied-count">0</span></h3><p>Applications Sent</p></div>
     </div>
 
-    <h3>Recent Matches</h3>
-    <div id="loading">Loading database...</div>
+    <div class="controls">
+        <div class="control-group">
+            <label for="search">Search Title or Company</label>
+            <input type="text" id="search" placeholder="e.g. Data Scientist, Roblox...">
+        </div>
+        <div class="control-group">
+            <label for="salary">Min Salary: $<span id="salary-val">0</span>k</label>
+            <input type="range" id="salary" min="0" max="250" value="0">
+        </div>
+        <button onclick="resetFilters()">Reset</button>
+    </div>
+
+    <div id="loading">Connecting to SQLite database...</div>
     <table id="job-table" style="display:none;">
         <thead>
             <tr>
                 <th>Date</th>
                 <th>Company</th>
                 <th>Title</th>
-                <th>Location</th>
+                <th>Min Salary</th>
                 <th>Status</th>
                 <th>Link</th>
             </tr>
@@ -48,57 +54,88 @@
     </table>
 
     <script>
-        async function initDashboard() {
-            const loading = document.getElementById('loading');
-            const table = document.getElementById('job-table');
-            
-            try {
-                // 1. Initialize SQL.js
-                const SQL = await initSqlJs({
-                    locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${file}`
-                });
+        let db;
+        const searchInput = document.getElementById('search');
+        const salaryInput = document.getElementById('salary');
+        const salaryVal = document.getElementById('salary-val');
 
-                // 2. Fetch your database file
-                // Path must match where your DB is relative to this HTML file
+        async function init() {
+            try {
+                const SQL = await initSqlJs({ locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${file}` });
                 const response = await fetch('projects/JobSearchAggregator/job_aggregator.db');
                 const buf = await response.arrayBuffer();
-                const db = new SQL.Database(new Uint8Array(buf));
-
-                // 3. Run Queries for stats
-                const total = db.exec("SELECT COUNT(*) FROM jobs")[0].values[0][0];
-                const applied = db.exec("SELECT COUNT(*) FROM jobs WHERE applied = 1")[0].values[0][0];
+                db = new SQL.Database(new Uint8Array(buf));
                 
-                document.getElementById('total-jobs').innerText = total;
-                document.getElementById('applied-count').innerText = applied;
+                // Set initial stats
+                updateStats();
+                // Render initial table
+                renderTable();
 
-                // 4. Run Query for table data
-                const result = db.exec("SELECT posted_date, company, title, location, applied, link FROM jobs ORDER BY posted_date DESC LIMIT 50");
-                const rows = result[0].values;
-                const tbody = document.getElementById('job-list');
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('job-table').style.display = 'table';
 
-                rows.forEach(row => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${row[0]}</td>
-                        <td>${row[1]}</td>
-                        <td>${row[2]}</td>
-                        <td>${row[3]}</td>
-                        <td>${row[4] == 1 ? '<span class="applied-tag">Applied</span>' : '<span class="new-tag">New</span>'}</td>
-                        <td><a href="${row[5]}" target="_blank">View</a></td>
-                    `;
-                    tbody.appendChild(tr);
+                // Listen for changes
+                searchInput.addEventListener('input', renderTable);
+                salaryInput.addEventListener('input', () => {
+                    salaryVal.innerText = salaryInput.value;
+                    renderTable();
                 });
-
-                loading.style.display = 'none';
-                table.style.display = 'table';
-
             } catch (err) {
-                loading.innerText = "Error loading database. Make sure 'job_aggregator.db' is in the same folder.";
-                console.error(err);
+                document.getElementById('loading').innerText = "Error: Database file not found.";
             }
         }
 
-        initDashboard();
+        function updateStats() {
+            const total = db.exec("SELECT COUNT(*) FROM jobs")[0].values[0][0];
+            const applied = db.exec("SELECT COUNT(*) FROM jobs WHERE applied = 1")[0].values[0][0];
+            document.getElementById('total-jobs').innerText = total;
+            document.getElementById('applied-count').innerText = applied;
+        }
+
+        function renderTable() {
+            const searchTerm = `%${searchInput.value}%`;
+            const minSal = salaryInput.value * 1000;
+            
+            // Re-run SQL query with filters
+            const query = `
+                SELECT posted_date, company, title, min_salary, applied, link 
+                FROM jobs 
+                WHERE (title LIKE ? OR company LIKE ?) 
+                AND (min_salary >= ? OR min_salary IS NULL)
+                ORDER BY posted_date DESC 
+                LIMIT 100
+            `;
+            
+            const stmt = db.prepare(query);
+            stmt.bind([searchTerm, searchTerm, minSal]);
+            
+            const tbody = document.getElementById('job-list');
+            tbody.innerHTML = '';
+
+            while (stmt.step()) {
+                const row = stmt.get();
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${row[0]}</td>
+                    <td><strong>${row[1]}</strong></td>
+                    <td>${row[2]}</td>
+                    <td>${row[3] ? '$' + row[3].toLocaleString() : 'N/A'}</td>
+                    <td>${row[4] == 1 ? '<span class="applied-tag">Applied</span>' : '<span class="new-tag">New</span>'}</td>
+                    <td><a href="${row[5]}" target="_blank">View Job</a></td>
+                `;
+                tbody.appendChild(tr);
+            }
+            stmt.free();
+        }
+
+        function resetFilters() {
+            searchInput.value = '';
+            salaryInput.value = 0;
+            salaryVal.innerText = '0';
+            renderTable();
+        }
+
+        init();
     </script>
 </body>
 </html>
