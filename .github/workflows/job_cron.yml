@@ -25,7 +25,9 @@ jobs:
       - name: Run job search
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: python main.py
+        run: |
+          cd projects/JobSearchAggregator
+          python main.py
 
       - name: Commit changes
         run: |
