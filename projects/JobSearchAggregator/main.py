@@ -183,10 +183,14 @@ def send_notification(job: JobListing, fit_data: dict):
 def is_duplicate(db, title, company):
     """Fuzzy check for duplicate roles within the last 7 days."""
     cursor = db.conn.cursor()
+
     # Remove special chars and lowercase for a 'fuzzy' match
-    def clean(s): return re.sub(r'[^a-zA-Z0-9]', '', s).lower()
-    
-    cursor.execute("SELECT title, company FROM jobs WHERE posted_date > date('now', '-7 days')")
+    def clean(s):
+        return re.sub(r"[^a-zA-Z0-9]", "", s).lower()
+
+    cursor.execute(
+        "SELECT title, company FROM jobs WHERE posted_date > date('now', '-7 days')"
+    )
     for row in cursor.fetchall():
         if clean(title) == clean(row[0]) and clean(company) == clean(row[1]):
             return True
@@ -204,25 +208,28 @@ async def fetch_hacker_news(client, keywords):
         # 1. Find the latest thread
         res = await client.get(url)
         hits = res.json().get("hits", [])
-        if not hits: return []
+        if not hits:
+            return []
         thread_id = hits[0]["objectID"]
-        
+
         # 2. Search comments for keywords (limit to first 3 to avoid spamming)
         search_url = f"https://hn.algolia.com/api/v1/search?tags=comment,story_{thread_id}&query="
         for kw in keywords[:3]:
             resp = await client.get(search_url + kw)
             hits = resp.json().get("hits", [])
             for hit in hits:
-                jobs.append(JobListing(
-                    source="HackerNews",
-                    external_id=f"hn-{hit['objectID']}",
-                    title=f"HN: {kw} Role",
-                    company="HN Startup",
-                    location="Remote/Hybrid",
-                    link=f"https://news.ycombinator.com/item?id={hit['objectID']}",
-                    description=hit.get("comment_text", ""),
-                    posted_date=datetime.now().strftime("%Y-%m-%d")
-                ))
+                jobs.append(
+                    JobListing(
+                        source="HackerNews",
+                        external_id=f"hn-{hit['objectID']}",
+                        title=f"HN: {kw} Role",
+                        company="HN Startup",
+                        location="Remote/Hybrid",
+                        link=f"https://news.ycombinator.com/item?id={hit['objectID']}",
+                        description=hit.get("comment_text", ""),
+                        posted_date=datetime.now().strftime("%Y-%m-%d"),
+                    )
+                )
     except Exception as e:
         logger.error(f"HN failed: {e}")
     return jobs
@@ -382,7 +389,9 @@ async def fetch_jobespresso(client, keywords):
 async def fetch_built_in_austin(client, keywords, city="austin"):
     """Fetcher for Built In Austin (Scraping/API hybrid approach)"""
     categories = ["data-analytics", "data-science"]
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
     jobs = []
 
     for cat in categories:
@@ -398,7 +407,7 @@ async def fetch_built_in_austin(client, keywords, city="austin"):
                 title_el = card.select_one("h2")
                 company_el = card.select_one("div.company-name")
                 link_el = card.select_one('a[data-id="job-card-title"]')
-                
+
                 if title_el and company_el and link_el:
                     title = title_el.text.strip()
                     if any(k.lower() in title.lower() for k in keywords):
@@ -596,7 +605,9 @@ async def main():
     logger.info(f"Fetched {len(all_jobs)} total jobs. Filtering & Scoring...")
 
     async def score_and_notify(job):
-        if not db.job_exists(job.external_id) and not is_duplicate(db, job.title, job.company):
+        if not db.job_exists(job.external_id) and not is_duplicate(
+            db, job.title, job.company
+        ):
             async with ai_semaphore:
                 fit = await calculate_fit_score(job, MY_RESUME)
                 if fit["score"] >= 7:
