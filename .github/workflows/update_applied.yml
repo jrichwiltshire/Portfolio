@@ -13,12 +13,12 @@ jobs:
 
         - name: Update Database
           run: |
-            sqlite3 projects/JobSearchAggregator/job_aggregator.db "UPDATE jobs SET applied = 1 WHERE external_id = '${{ github.event.client_payload.id }}';"
+            sqlite3 docs/job_aggregator.db "UPDATE jobs SET applied = 1 WHERE external_id = '${{ github.event.client_payload.id }}';"
 
         - name: Commit and Push
           run: |
             git config --local user.email "action@github.com"
             git config --local user.name "Github Action"
-            git add -f projects/JobSearchAggregator/job_aggregator.db
+            git add -f docs/job_aggregator.db
             git commit -m "Marked job {{ github.event.client_payload.id }} as applied" || echo "No changes"
             git push
