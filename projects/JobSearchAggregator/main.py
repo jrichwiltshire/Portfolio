@@ -1,19 +1,36 @@
-from dataclasses import dataclass
-from datetime import datetime
-from typing import Optional
+import asyncio
 import sqlite3
-import requests
-import re
 import os
-import openai
 import json
-from dotenv import load_dotenv
-from bs4 import BeautifulSoup
+import re
+from datetime import datetime
+from dataclasses import dataclass
+from typing import Optional, List
+import logging
 
+import httpx
+import feedparser
+from bs4 import BeautifulSoup
+from dotenv import load_dotenv
+import openai
+
+# --- CONFIGURATION ---
 load_dotenv()
 
-with open("resume.txt", "r") as f:
-    MY_RESUME = f.read()
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
+DB_PATH = "../../docs/job_aggregator.db"
+RESUME_PATH = "resume.txt"
+
+try:
+    with open(RESUME_PATH, "r") as f:
+        MY_RESUME = f.read()
+except FileNotFoundError:
+    MY_RESUME = ""
+    logger.warning("resume.txt not found. AI scoring will be less accurate.")
 
 
 # --- 1. DATA MODEL ---
@@ -26,14 +43,15 @@ class JobListing:
     location: str
     link: str
     description: str
-    posted_date: datetime
+    posted_date: str
     min_salary: Optional[int] = None
     max_salary: Optional[int] = None
 
 
 # --- 2. DATABASE LOGIC ---
 class JobDatabase:
-    def __init__(self, db_name="job_aggregator.db"):
+    def __init__(self, db_name=DB_PATH):
+        os.makedirs(os.path.dirname(db_name), exist_ok=True)
         self.conn = sqlite3.connect(db_name)
         self.create_table()
 
@@ -87,6 +105,8 @@ class JobDatabase:
 def extract_salary(description):
     """Simple regex to find salary numbers like $120,000 in text."""
     # Matches patterns like $100,000 or $100k
+    if not description:
+        return None
     matches = re.findall(r"\$(\d{1,3}(?:,\d{3})*)", description)
     if matches:
         # Clean the string and convert to integer
@@ -97,39 +117,40 @@ def extract_salary(description):
     return None
 
 
-def calculate_fit_score(job_description, resume_text):
+async def calculate_fit_score(job: JobListing, resume_text: str):
     """Uses AI to compare the job to your resume."""
-    client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    if not resume_text:
+        return {"score": 5, "reason": "No resume provided."}
 
-    truncated_desc = (
-        job_description[:12000] if job_description else "No description provided."
-    )
+    client = openai.AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     prompt = f"""
-    You are an expert career coach. Compare the following Resume and Job Description.
+    Role: Career Coach
+    Task: Score this job fit (1-10) for the candidate.
 
-    Resume: {resume_text}
-    Job Description: {truncated_desc}
+    Resume: {resume_text[:2000]}...
+    Job: {job.title} at {job.company}
+    Desc: {job.description[:2000]}...
 
-    Return ONLY a JSON object with:
-    1. "score": An integer from 1 to 10.
-    2. "reason": A one-sentence explanation of why it fits or doesn't.
+    Output JSON: {{ "score": int, "reason": "short string"}}
     """
 
     try:
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
         )
         return json.loads(response.choices[0].message.content)
     except Exception as e:
-        print(f"AI Scoring Error: {e}")
-        return None
+        logger.error(f"AI Error: {e}")
+        return {"score": 0, "reason": "AI Error"}
 
 
 def send_notification(job: JobListing, fit_data: dict):
     webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
+    if not webhook_url:
+        return
 
     # Choose a color based on score: Green for 9-10, Yellow for 7-8
     color = 5025616 if fit_data["score"] >= 9 else 16776960
@@ -153,329 +174,446 @@ def send_notification(job: JobListing, fit_data: dict):
             }
         ],
     }
-    requests.post(webhook_url, json=payload)
-
-
-def optimize_search_queries(db_path="job_aggregator.db"):
-    """Analyzes high-scoring jobs to suggest better search terms."""
-    conn = sqlite3.connect(db_path)
-    # Get title of jobs that had high match scores in previous runs
-    cursor = conn.execute(
-        "SELECT title FROM jobs WHERE applied = 1 OR description LIKE '%Score: 9%' LIMIT 10"
-    )
-    past_titles = [row[0] for row in cursor.fetchall()]
-    conn.close()
-
-    if not past_titles:
-        return [
-            "Data Analyst",
-            "Data Scientist",
-            "Analytics",
-            "Machine Learning",
-            "BI Developer",
-        ]
-
-    client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    prompt = f"""
-    Based on these job titles I liked: {past_titles}
-    Identify the top 5 most effective 'Search Keywords' I should use on job boards to find simliar high-paying roles in Austin.
-    Return ONLY a JSON list of strings.
-    """
-
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
-        )
-        new_keywords = json.loads(response.choices[0].message.content).get(
-            "keywords", []
-        )
-        return new_keywords
+        httpx.post(webhook_url, json=payload)
     except:
-        return [
-            "Data Analyst",
-            "Data Scientist",
-            "Analytics",
-            "Machine Learning",
-            "BI Developer",
-        ]
+        pass
+
+
+def is_duplicate(db, title, company):
+    """Fuzzy check for duplicate roles within the last 7 days."""
+    cursor = db.conn.cursor()
+    # Remove special chars and lowercase for a 'fuzzy' match
+    def clean(s): return re.sub(r'[^a-zA-Z0-9]', '', s).lower()
+    
+    cursor.execute("SELECT title, company FROM jobs WHERE posted_date > date('now', '-7 days')")
+    for row in cursor.fetchall():
+        if clean(title) == clean(row[0]) and clean(company) == clean(row[1]):
+            return True
+    return False
 
 
 # --- 4. FETCHERS ---
-def fetch_arbeitnow(search_keywords, city_filter, min_salary=0):
-    print(f"Searching Arbeitnow for {search_keywords} in {city_filter}...")
+# 0. Hacker News (API)
+async def fetch_hacker_news(client, keywords):
+    """Uses Algolia API to search the latest 'Who is Hiring' thread."""
+    logger.info("Searching Hacker News...")
+    url = "https://hn.algolia.com/api/v1/search?tags=story,author_whoishiring&hitsPerPage=1"
+    jobs = []
+    try:
+        # 1. Find the latest thread
+        res = await client.get(url)
+        hits = res.json().get("hits", [])
+        if not hits: return []
+        thread_id = hits[0]["objectID"]
+        
+        # 2. Search comments for keywords (limit to first 3 to avoid spamming)
+        search_url = f"https://hn.algolia.com/api/v1/search?tags=comment,story_{thread_id}&query="
+        for kw in keywords[:3]:
+            resp = await client.get(search_url + kw)
+            hits = resp.json().get("hits", [])
+            for hit in hits:
+                jobs.append(JobListing(
+                    source="HackerNews",
+                    external_id=f"hn-{hit['objectID']}",
+                    title=f"HN: {kw} Role",
+                    company="HN Startup",
+                    location="Remote/Hybrid",
+                    link=f"https://news.ycombinator.com/item?id={hit['objectID']}",
+                    description=hit.get("comment_text", ""),
+                    posted_date=datetime.now().strftime("%Y-%m-%d")
+                ))
+    except Exception as e:
+        logger.error(f"HN failed: {e}")
+    return jobs
+
+
+# 1. Arbeitnow (API)
+async def fetch_arbeitnow(client, search_keywords):
+    logger.info(f"Searching Arbeitnow for {search_keywords}...")
     url = "https://www.arbeitnow.com/api/job-board-api"
-    all_found_jobs = []
+    jobs = []
 
     # --- Source 1. Arbeitnow ---
     try:
-        res = requests.get(url)
+        res = await client.get(url)
         data = res.json().get("data", [])
         for item in data:
             title = item["title"].lower()
-            location = item["location"].lower()
-
-            if (
-                any(k.lower() in title for k in search_keywords)
-                and city_filter.lower() in location
-            ):
-                desc = item["description"]
-                detected_salary = extract_salary(desc)
-
-                if detected_salary and detected_salary < min_salary:
-                    continue
-
-                job = JobListing(
-                    source="Arbeitnow",
-                    external_id=f"an-{item['slug']}",  # Creating a unique ID
-                    title=item["title"],
-                    company=item["company_name"],
-                    location=item["location"],
-                    link=item["url"],
-                    description=item["description"],
-                    posted_date=datetime.now().strftime("%Y-%m-%d"),
-                    min_salary=None,
-                    max_salary=None,
+            if any(k.lower() in title for k in search_keywords):
+                jobs.append(
+                    JobListing(
+                        source="Arbeitnow",
+                        external_id=f"an-{item['slug']}",
+                        title=item["title"],
+                        company=item["company_name"],
+                        location=item["location"],
+                        link=item["url"],
+                        description=item["description"],
+                        posted_date=datetime.now().strftime("%Y-%m-%d"),
+                        min_salary=None,
+                        max_salary=None,
+                    )
                 )
-                all_found_jobs.append(job)
     except Exception as e:
-        print(f"Error fetching from Arbeitnow: {e}")
+        logger.error(f"Error fetching from Arbeitnow: {e}")
+    return jobs
 
-    return all_found_jobs
+
+# 2. RemoteOK (API)
+async def fetch_remote_ok(client, keywords):
+    """Fetcher for RemoteOK (Great for Data Science Roles)"""
+    logger.info(f"Checking RemoteOK for {keywords}...")
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebkit/537.36"
+    }
+    url = "https://remoteok.com/api"
+    jobs = []
+
+    try:
+        res = await client.get(url, headers=headers)
+        data = res.json()
+
+        for item in data[1:]:
+            title = item.get("position", "").lower()
+
+            if any(k.lower() in title for k in keywords):
+                jobs.append(
+                    JobListing(
+                        source="RemoteOK",
+                        external_id=f"rok-{item['id']}",
+                        title=item.get("position"),
+                        company=item.get("company", "Unknown"),
+                        location="Remote",
+                        link=item.get("url"),
+                        description=item.get("description", ""),
+                        posted_date=datetime.now().strftime("%Y-%m-%d"),
+                        min_salary=extract_salary(item.get("description", "")),
+                    )
+                )
+    except Exception as e:
+        logger.error(f"Error fetching from RemoteOK: {e}")
+    return jobs
 
 
-def fetch_built_in_austin(keywords, city_filter, min_salary=0):
+# 3. Remotive (API)
+async def fetch_remotive(client, keywords):
+    url = "https://remotive.com/api/remote-jobs"
+    jobs = []
+    try:
+        res = await client.get(url)
+        data = res.json().get("jobs", [])
+        for item in data:
+            if any(k.lower() in item["title"].lower() for k in keywords):
+                jobs.append(
+                    JobListing(
+                        source="Remotive",
+                        external_id=f"rm-{item['id']}",
+                        title=item["title"],
+                        company=item["company_name"],
+                        location=item.get("candidate_required_location", "Remote"),
+                        link=item["url"],
+                        description=item["description"],
+                        posted_date=item["publication_date"][:10],
+                    )
+                )
+    except Exception as e:
+        logger.error(f"Remotive failed: {e}")
+    return jobs
+
+
+# 4. WeWorkRemotely (RSS)
+async def fetch_wwr(client, keywords):
+    feeds = [
+        "https://weworkremotely.com/categories/remote-back-end-programming-jobs.rss",
+        "https://weworkremotely.com/categories/data-analysis.rss",
+    ]
+    jobs = []
+    try:
+        for feed_url in feeds:
+            res = await client.get(feed_url)
+            feed = feedparser.parse(res.text)
+            for entry in feed.entries:
+                if any(k.lower() in entry.title.lower() for k in keywords):
+                    jobs.append(
+                        JobListing(
+                            source="WeWorkRemotely",
+                            external_id=f"wwr-{entry.id}",
+                            title=entry.title,
+                            company=entry.get("author", "Unknown"),
+                            location="Remote",
+                            link=entry.link,
+                            description=entry.summary,
+                            posted_date=datetime.now().strftime("%Y-%m-%d"),
+                        )
+                    )
+    except Exception as e:
+        logger.error(f"WWR failed: {e}")
+    return jobs
+
+
+# 5. Jobspresso
+async def fetch_jobespresso(client, keywords):
+    url = "https://jobspresso.co/feed/"
+    jobs = []
+    try:
+        res = await client.get(url)
+        feed = feedparser.parse(res.text)
+        for entry in feed.entries:
+            if any(k.lower() in entry.title.lower() for k in keywords):
+                jobs.append(
+                    JobListing(
+                        source="Jobspresso",
+                        external_id=f"jp-{entry.id}",
+                        title=entry.title,
+                        company="Jobspresso Listing",
+                        location="Remote",
+                        link=entry.link,
+                        description=entry.summary,
+                        posted_date=datetime.now().strftime("%Y-%m-%d"),
+                    )
+                )
+    except Exception as e:
+        logger.error(f"Jobspresso failed: {e}")
+    return jobs
+
+
+# 6. Built In (Scraper) - Async
+async def fetch_built_in_austin(client, keywords, city="austin"):
     """Fetcher for Built In Austin (Scraping/API hybrid approach)"""
     categories = ["data-analytics", "data-science"]
-    headers = {"User-Agent": "Mozilla/5.0"}
-    found_jobs = []
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    jobs = []
 
     for cat in categories:
-        print(f"Checking Built In Austin: {cat}...")
+        logger.info(f"Checking Built In Austin: {cat}...")
         url = f"https://www.builtinaustin.com/jobs/{cat}"
 
         try:
-            res = requests.get(url, headers=headers)
-            soup = BeautifulSoup(res.text, "html.parser")
+            res = await client.get(url, headers=headers)
+            soup = BeautifulSoup(res.text, "lxml")
 
             job_cards = soup.select('div[data-id="job-card"]')
             for card in job_cards:
-                try:
-                    # Use .select_one and check existence to avoid NoneType errors
-                    title_el = card.select_one("h2")
-                    company_el = card.select_one("div.company-name")
-                    link_el = card.select_one('a[data-id="job-card-title"]')
-                    # Check if elements were found
-                    if title_el and company_el:
-                        title = title_el.text.strip()
-                        company = company_el.text.strip()
-                        if any(k.lower() in title.lower() for k in keywords):
-                            company = card.find(
-                                "div", {"class": "company-name"}
-                            ).text.strip()
-                            link = (
-                                "https://www.builtinaustin.com" + card.find("a")["href"]
-                            )
-
-                            job = JobListing(
+                title_el = card.select_one("h2")
+                company_el = card.select_one("div.company-name")
+                link_el = card.select_one('a[data-id="job-card-title"]')
+                
+                if title_el and company_el and link_el:
+                    title = title_el.text.strip()
+                    if any(k.lower() in title.lower() for k in keywords):
+                        link = "https://www.builtinaustin.com" + link_el["href"]
+                        jobs.append(
+                            JobListing(
                                 source="BuiltInAustin",
                                 external_id=f"bia-{hash(link)}",
                                 title=title,
-                                company=company,
+                                company=company_el.text.strip(),
                                 location="Austin, TX",
                                 link=link,
                                 description="Visit link for full description...",
                                 posted_date=datetime.now().strftime("%Y-%m-%d"),
                             )
-                            found_jobs.append(job)
-
-                except Exception as e:
-                    continue  # Skip one bad card rather than crashing the whole fetcher
+                        )
         except Exception as e:
-            print(f"Error fetching from BuiltInAustin: {e}")
-    return found_jobs
+            logger.error(f"BuiltIn ({cat}) failed: {e}")
+    return jobs
 
 
-def fetch_remote_ok(keywords, city_filter, min_salary=0):
-    """Fetcher for RemoteOK (Great for Data Science Roles)"""
-    print(f"Checking RemoteOK for {keywords}...")
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebkit/537.36"
-    }
-    url = "https://remoteok.com/api"
-    found_jobs = []
+# 7. Adzuna (API)
+async def fetch_adzuna(client, keywords):
+    app_id = os.getenv("ADZUNA_APP_ID")
+    app_key = os.getenv("ADZUNA_APP_KEY")
+    if not app_id:
+        return []
+
+    jobs = []
+    query = "%20".join(keywords[:3])
+    url = f"https://api.adzuna.com/v1/api/jobs/us/search/1?app_id={app_id}&app_key={app_key}&results_per_page=20&what={query}&where=Austin"
 
     try:
-        res = requests.get(url, headers=headers)
-        data = res.json()
-
-        for item in data[1:]:  # data[0] is often a legal/disclaimer object, skip it
-            title = item.get("position", "").lower()
-
-            if any(k.lower() in title for k in keywords):
-                # Salary check
-                salary = item.get("salary_min") or extract_salary(
-                    item.get("description", "")
-                )
-                if salary and salary < min_salary:
-                    continue
-
-                job = JobListing(
-                    source="RemoteOK",
-                    external_id=f"rok-{item['id']}",
-                    title=item["position"],
-                    company=item["company"],
-                    location="Remote",
-                    link=item["url"],
+        res = await client.get(url)
+        data = res.json().get("results", [])
+        for item in data:
+            jobs.append(
+                JobListing(
+                    source="Adzuna",
+                    external_id=f"adz-{item['id']}",
+                    title=item["title"],
+                    company=item["company"]["display_name"],
+                    location=item["location"]["display_name"],
+                    link=item["redirect_url"],
                     description=item["description"],
-                    posted_date=datetime.now().strftime("%Y-%m-%d"),
-                    min_salary=salary,
+                    posted_date=item["created"][:10],
+                    min_salary=item.get("salary_min"),
                     max_salary=item.get("salary_max"),
                 )
-                found_jobs.append(job)
+            )
     except Exception as e:
-        print(f"Error fetching from RemoteOK: {e}")
-    return found_jobs
+        logger.error(f"Adzuna failed: {e}")
+    return jobs
 
 
-def fetch_greenhouse_companies(keywords, city_filter, min_salary=0):
+# 8. Greenhouse Boards (Direct)
+async def fetch_greenhouse_companies(client, keywords, companies):
     """Fetcher for companies using Greenhouse (e.g., DoorDash, Stripe, etc.)"""
-    target_companies = [
+    jobs = []
+
+    for co in companies:
+        logger.info(f"Checking Greenhouse board for {co}...")
+        url = f"https://boards-api.greenhouse.io/v1/boards/{co}/jobs"
+        try:
+            res = await client.get(url)
+            data = res.json().get("jobs", [])
+            for item in data:
+                title = item["title"]
+
+                if any(k.lower() in title.lower() for k in keywords):
+                    jobs.append(
+                        JobListing(
+                            source=f"Greehouse-{co}",
+                            external_id=f"gh-{item['id']}",
+                            title=title,
+                            company=co.capitalize(),
+                            location=item.get("location", {}).get("name", "Remote"),
+                            link=item["absolute_url"],
+                            description="View Greenhouse for details",
+                            posted_date=datetime.now().strftime("%Y-%m-%d"),
+                        )
+                    )
+        except:
+            pass
+    return jobs
+
+
+# 9. Lever Boards (Direct Scraper)
+async def fetch_lever(client, keywords, companies):
+    jobs = []
+    for co in companies:
+        url = f"https://jobs.lever.co/{co}"
+        try:
+            res = await client.get(url)
+            soup = BeautifulSoup(res.text, "lxml")
+            postings = soup.select(".posting")
+            for post in postings:
+                title = post.select_one("h5").text
+                if any(k.lower() in title.lower() for k in keywords):
+                    link = post.select_one("a.posting-title")["href"]
+                    jobs.append(
+                        JobListing(
+                            source=f"Lever-{co}",
+                            external_id=f"lev-{hash(link)}",
+                            title=title,
+                            company=co.capitalize(),
+                            location="Remote/Hybrid",
+                            link=link,
+                            description="See Lever link",
+                            posted_date=datetime.now().strftime("%Y-%m-%d"),
+                        )
+                    )
+        except:
+            pass
+    return jobs
+
+
+# 10. Ashby Boards (Direct API-ish)
+async def fetch_ashby(client, keywords, companies):
+    jobs = []
+    for co in companies:
+        url = f"https://api.ashbyhq.com/posting-api/job-board/{co}"
+        try:
+            res = await client.get(url)
+            data = res.json().get("jobs", [])
+            for item in data:
+                title = item["title"]
+                if any(k.lower() in title.lower() for k in keywords):
+                    jobs.append(
+                        JobListing(
+                            source=f"Ashby-{co}",
+                            external_id=f"ash-{item['id']}",
+                            title=title,
+                            company=co.capitalize(),
+                            location=item.get("location", "Remote"),
+                            link=item["jobUrl"],
+                            description="See Ashby Link",
+                            posted_date=datetime.now().strftime("%Y-%m-%d"),
+                        )
+                    )
+
+        except:
+            pass
+    return jobs
+
+
+# --- 3. MAIN ORCHESTRATOR
+async def main():
+    db = JobDatabase()
+    # Limit to 3 concurrent AI calls to stay under rate limits
+    ai_semaphore = asyncio.BoundedSemaphore(3)
+
+    keywords = [
+        "Data Analyst",
+        "Data Scientist",
+        "Analytics",
+        "Machine Learning",
+        "BI Developer",
+    ]
+
+    # Target Companies Lists
+    gh_companies = [
         "crowdstrike",
         "cloudflare",
         "roblox",
         "atlassian",
-        "anaconda",
-        "pivotalsoftware",
-        "alertmedia",
-        "digitalocean",
-        "confluent",
-        "databricks",
-        "snowflake",
-        "mongodb",
-        "elastic",
-        "hashicorp",
-        "fivetran",
-        "dbtlabs",
-        "unity",
+        "spotify",
         "discord",
-        "figma",
-        "notion",
     ]
-    found_jobs = []
+    lever_companies = ["linear", "anthropic", "netflix", "twitch"]
+    ashby_companies = ["notion", "ramp", "incident", "vercel"]
 
-    for co in target_companies:
-        print(f"Checking Greenhouse board for {co}...")
-        url = f"https://boards-api.greenhouse.io/v1/boards/{co}/jobs"
-        try:
-            res = requests.get(url).json()
-            for item in res.get("jobs", []):
-                title = item["title"].lower()
-                location = item.get("location", {}).get("name", "").lower()
+    logger.info("Starting Async Job Search...")
 
-                if (
-                    any(k.lower() in title for k in keywords)
-                    and city_filter.lower() in location
-                ):
-                    job = JobListing(
-                        source=f"Greehouse-{co}",
-                        external_id=f"gh-{item['id']}",
-                        title=item["title"],
-                        company=co.capitalize(),
-                        location=item.get("location", {}).get("name"),
-                        link=item["absolute_url"],
-                        description="View Greenhouse for details",
-                        posted_date=datetime.now().strftime("%Y-%m-%d"),
-                    )
-                    found_jobs.append(job)
-        except:
-            continue
-    return found_jobs
+    async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+        # Launch all fetchers in parallel
+        tasks = [
+            fetch_hacker_news(client, keywords),
+            fetch_arbeitnow(client, keywords),
+            fetch_remote_ok(client, keywords),
+            fetch_remotive(client, keywords),
+            fetch_wwr(client, keywords),
+            fetch_jobespresso(client, keywords),
+            fetch_built_in_austin(client, keywords),
+            fetch_greenhouse_companies(client, keywords, gh_companies),
+            fetch_lever(client, keywords, lever_companies),
+            fetch_ashby(client, keywords, ashby_companies),
+            fetch_adzuna(client, keywords),
+        ]
 
+        results = await asyncio.gather(*tasks)
 
-def fetch_adzuna(keywords, city_filter, min_salary=0):
-    APP_ID = os.getenv("ADZUNA_APP_ID")
-    APP_KEY = os.getenv("ADZUNA_APP_KEY")
-    found_jobs = []
+    # Flatten list
+    all_jobs = [job for sublist in results for job in sublist]
+    logger.info(f"Fetched {len(all_jobs)} total jobs. Filtering & Scoring...")
 
-    # Adzuna uses space-separated keywords
-    query = "%20".join(keywords)
-    url = f"https://api.adzuna.com/v1/api/jobs/us/search/1?app_id={APP_ID}&app_key={APP_KEY}&results_per_page=20&what={query}&where={city_filter}"
+    async def score_and_notify(job):
+        if not db.job_exists(job.external_id) and not is_duplicate(db, job.title, job.company):
+            async with ai_semaphore:
+                fit = await calculate_fit_score(job, MY_RESUME)
+                if fit["score"] >= 7:
+                    db.upsert_job(job)
+                    send_notification(job, fit)
+                    logger.info(f"MATCH: {job.title} ({fit['score']}/10)")
+                    return True
+        return False
 
-    try:
-        res = requests.get(url).json()
-        for item in res.get("results", []):
-            # Adzuna gives us salary directly!
-            salary = item.get("salary_min", 0)
-            if salary and salary < min_salary:
-                continue
+    # Run scoring tasks in parallel (but throttled by semaphore)
+    scoring_tasks = [score_and_notify(job) for job in all_jobs]
+    results = await asyncio.gather(*scoring_tasks)
+    new_count = sum(1 for r in results if r)
 
-            job = JobListing(
-                source="Adzuna",
-                external_id=f"adz-{item['id']}",
-                title=item["title"],
-                company=item["company"]["display_name"],
-                location=item["location"]["display_name"],
-                link=item["redirect_url"],
-                description=item["description"],
-                posted_date=item["created"],
-                min_salary=salary,
-                max_salary=item.get("salary_max"),
-            )
-            found_jobs.append(job)
-    except Exception as e:
-        print(f"Adzuna Error: {e}")
-    return found_jobs
+    logger.info(f"Done. Found {new_count} new relevant jobs.")
 
 
 # --- 3. THE "WORKER" (MAIN EXECUTION) ---
 if __name__ == "__main__":
-    db = JobDatabase(db_name="../../docs/job_aggregator.db")
-
-    fetchers = [
-        fetch_arbeitnow,
-        fetch_remote_ok,
-        fetch_built_in_austin,
-        fetch_greenhouse_companies,
-        fetch_adzuna,
-    ]
-
-    optimized_keywords = optimize_search_queries()
-
-    # 1. Define focus areas
-    SETTINGS = {
-        "keywords": [
-            "Data Analyst",
-            "Data Scientist",
-            "Analytics",
-            "Machine Learning",
-            "BI Developer",
-        ],
-        "city": "Austin",
-        "min_salary": 0,
-    }
-
-    SETTINGS["keywords"] = list(set(SETTINGS["keywords"] + optimized_keywords))
-
-    new_jobs_found = 0
-    for fetch_func in fetchers:
-        try:
-            real_jobs = fetch_func(
-                SETTINGS["keywords"], SETTINGS["city"], SETTINGS["min_salary"]
-            )
-
-            for job in real_jobs:
-                if not db.job_exists(job.external_id):
-                    ai_evaluation = calculate_fit_score(job.description, MY_RESUME)
-
-                    if ai_evaluation and ai_evaluation.get("score", 0) >= 7:
-                        db.upsert_job(job)
-                        send_notification(job, ai_evaluation)
-                        new_jobs_found += 1
-
-        except Exception as e:
-            print(f"Error in {fetch_func.__name__}: {e}")
-    print(
-        f"Check complete. Found {new_jobs_found} new matching jobs in {SETTINGS['city']}."
-    )
+    asyncio.run(main())
