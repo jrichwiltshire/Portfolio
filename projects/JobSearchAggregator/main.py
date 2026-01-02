@@ -46,6 +46,7 @@ class JobListing:
     posted_date: str
     min_salary: Optional[int] = None
     max_salary: Optional[int] = None
+    why_me: Optional[str] = None
 
 
 # --- 2. DATABASE LOGIC ---
@@ -68,10 +69,16 @@ class JobDatabase:
             posted_date TEXT,
             min_salary INTEGER,
             max_salary INTEGER,
-            applied INTEGER DEFAULT 0 -- 0 = No, 1 = Yes
+            applied INTEGER DEFAULT 0,
+            why_me TEXT
         )
         """
         self.conn.execute(query)
+        # Migration: Add column if it doesn't exist (for existing DBs)
+        try:
+            self.conn.execute("ALTER TABLE jobs ADD COLUMN why_me TEXT")
+        except sqlite3.OperationalError:
+            pass # Column already exists
         self.conn.commit()
 
     def job_exists(self, external_id):
@@ -81,7 +88,7 @@ class JobDatabase:
 
     def upsert_job(self, job: JobListing):
         """Inserts a job, or ignores it if the external_id already exists."""
-        query = "INSERT OR IGNORE INTO jobs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        query = "INSERT OR IGNORE INTO jobs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         self.conn.execute(
             query,
             (
@@ -96,25 +103,48 @@ class JobDatabase:
                 job.min_salary,
                 job.max_salary,
                 0,
+                job.why_me
             ),
         )
         self.conn.commit()
 
 
 # --- 3. UTILITIES ---
-def extract_salary(description):
-    """Simple regex to find salary numbers like $120,000 in text."""
-    # Matches patterns like $100,000 or $100k
-    if not description:
-        return None
-    matches = re.findall(r"\$(\d{1,3}(?:,\d{3})*)", description)
-    if matches:
-        # Clean the string and convert to integer
-        nums = [
-            int(m.replace(",", "")) for m in matches if int(m.replace(",", "")) > 1000
-        ]
-        return min(nums) if nums else None
-    return None
+def extract_salary(text):
+    """
+    Parses salary text to return (min_annual, max_annual).
+    Handles: $120k, $120,000, $60/hr, $5000/mo.
+    """
+    if not text:
+        return (None, None)
+    
+    text = text.lower().replace(",", "")
+    
+    # 1. Hourly check ($50-80/hr)
+    hourly_matches = re.findall(r"\$(\d+)(?:-\$(\d+))?/hr", text)
+    if hourly_matches:
+        # Take the first match
+        low, high = hourly_matches[0]
+        min_sal = int(low) * 2080
+        max_sal = int(high) * 2080 if high else min_sal
+        return (min_sal, max_sal)
+
+    # 2. 'k' suffix check ($120k - $150k)
+    # Matches $120k or $120-150k
+    k_matches = re.findall(r"\$(\d{2,3})k", text)
+    if k_matches:
+        nums = [int(m) * 1000 for m in k_matches]
+        return (min(nums), max(nums))
+
+    # 3. Standard check ($120000)
+    # Look for large numbers
+    std_matches = re.findall(r"\$(\d{4,7})", text)
+    if std_matches:
+        nums = [int(m) for m in std_matches if int(m) > 15000] # Filter out tiny numbers
+        if nums:
+            return (min(nums), max(nums))
+
+    return (None, None)
 
 
 async def calculate_fit_score(job: JobListing, resume_text: str):
@@ -132,7 +162,11 @@ async def calculate_fit_score(job: JobListing, resume_text: str):
     Job: {job.title} at {job.company}
     Desc: {job.description[:2000]}...
 
-    Output JSON: {{ "score": int, "reason": "short string"}}
+    Output JSON: {{ 
+        "score": int, 
+        "reason": "short string",
+        "why_me": "3 bullet points (max 50 words) explaining why I am a good fit based on my resume. Use markdown bullets."
+    }}
     """
 
     try:
@@ -167,6 +201,7 @@ def send_notification(job: JobListing, fit_data: dict):
                     f"**Company:** {job.company}\n"
                     f"**Location:** {job.location}\n\n"
                     f"**AI Analysis:** {fit_data['reason']}\n\n"
+                    f"**Why Me:**\n{fit_data.get('why_me', 'N/A')}\n\n"
                     f"📝 [Mark as Applied]({apply_url})"
                 ),
                 "color": color,
@@ -248,6 +283,7 @@ async def fetch_arbeitnow(client, search_keywords):
         for item in data:
             title = item["title"].lower()
             if any(k.lower() in title for k in search_keywords):
+                sal_min, sal_max = extract_salary(item["description"])
                 jobs.append(
                     JobListing(
                         source="Arbeitnow",
@@ -258,8 +294,8 @@ async def fetch_arbeitnow(client, search_keywords):
                         link=item["url"],
                         description=item["description"],
                         posted_date=datetime.now().strftime("%Y-%m-%d"),
-                        min_salary=None,
-                        max_salary=None,
+                        min_salary=sal_min,
+                        max_salary=sal_max,
                     )
                 )
     except Exception as e:
@@ -285,6 +321,7 @@ async def fetch_remote_ok(client, keywords):
             title = item.get("position", "").lower()
 
             if any(k.lower() in title for k in keywords):
+                sal_min, sal_max = extract_salary(item.get("description", ""))
                 jobs.append(
                     JobListing(
                         source="RemoteOK",
@@ -295,7 +332,8 @@ async def fetch_remote_ok(client, keywords):
                         link=item.get("url"),
                         description=item.get("description", ""),
                         posted_date=datetime.now().strftime("%Y-%m-%d"),
-                        min_salary=extract_salary(item.get("description", "")),
+                        min_salary=sal_min,
+                        max_salary=sal_max,
                     )
                 )
     except Exception as e:
@@ -611,6 +649,7 @@ async def main():
             async with ai_semaphore:
                 fit = await calculate_fit_score(job, MY_RESUME)
                 if fit["score"] >= 7:
+                    job.why_me = fit.get("why_me") # Save the pitch
                     db.upsert_job(job)
                     send_notification(job, fit)
                     logger.info(f"MATCH: {job.title} ({fit['score']}/10)")
