@@ -85,7 +85,9 @@
                     renderTable();
                 });
             } catch (err) {
-                document.getElementById('loading').innerText = "Error: Database file not found.";
+                console.error(err);
+                document.getElementById('loading').innerText = "Error loading database: " + err.message;
+                document.getElementById('loading').style.color = "red";
             }
         }
 
