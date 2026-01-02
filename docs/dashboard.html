@@ -7,7 +7,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.min.css">
     <style>
-        body { max-width: 1100px; margin: auto; padding: 20px; }
+        body { max-width: 1200px; margin: auto; padding: 20px; }
         .controls { background: #f0f4f8; padding: 20px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap; }
         .control-group { display: flex; flex-direction: column; gap: 5px; }
         input[type="text"], input[type="range"] { width: 250px; }
@@ -16,6 +16,9 @@
         .applied-tag { color: white; background: #27ae60; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; }
         .new-tag { color: white; background: #3498db; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; }
         tr:hover { background-color: #f9f9f9; }
+        details { cursor: pointer; color: #555; font-size: 0.9em; }
+        summary { font-weight: bold; color: #2980b9; }
+        .pitch-content { margin-top: 5px; color: #444; white-space: pre-wrap; font-size: 0.85rem; }
     </style>
 </head>
 <body>
@@ -45,7 +48,8 @@
                 <th>Date</th>
                 <th>Company</th>
                 <th>Title</th>
-                <th>Min Salary</th>
+                <th>Salary</th>
+                <th>Pitch</th>
                 <th>Status</th>
                 <th>Link</th>
             </tr>
@@ -98,7 +102,7 @@
             
             // Re-run SQL query with filters
             const query = `
-                SELECT posted_date, company, title, min_salary, applied, link 
+                SELECT posted_date, company, title, min_salary, max_salary, why_me, applied, link 
                 FROM jobs 
                 WHERE (title LIKE ? OR company LIKE ?) 
                 AND (min_salary >= ? OR min_salary IS NULL)
@@ -114,14 +118,32 @@
 
             while (stmt.step()) {
                 const row = stmt.get();
+                // row: [0:date, 1:co, 2:title, 3:min, 4:max, 5:why, 6:app, 7:link]
+                
+                let salaryDisplay = 'N/A';
+                if (row[3]) {
+                    const minK = Math.round(row[3] / 1000) + 'k';
+                    if (row[4] && row[4] > row[3]) {
+                        const maxK = Math.round(row[4] / 1000) + 'k';
+                        salaryDisplay = `$${minK} - $${maxK}`;
+                    } else {
+                        salaryDisplay = `$${minK}`;
+                    }
+                }
+
+                const pitchHtml = row[5] ? 
+                    `<details><summary>Why Me?</summary><div class="pitch-content">${row[5]}</div></details>` : 
+                    '<span style="color:#ccc;">-</span>';
+
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${row[0]}</td>
                     <td><strong>${row[1]}</strong></td>
                     <td>${row[2]}</td>
-                    <td>${row[3] ? '$' + row[3].toLocaleString() : 'N/A'}</td>
-                    <td>${row[4] == 1 ? '<span class="applied-tag">Applied</span>' : '<span class="new-tag">New</span>'}</td>
-                    <td><a href="${row[5]}" target="_blank">View Job</a></td>
+                    <td>${salaryDisplay}</td>
+                    <td>${pitchHtml}</td>
+                    <td>${row[6] == 1 ? '<span class="applied-tag">Applied</span>' : '<span class="new-tag">New</span>'}</td>
+                    <td><a href="${row[7]}" target="_blank">View Job</a></td>
                 `;
                 tbody.appendChild(tr);
             }
