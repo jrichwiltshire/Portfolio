@@ -602,7 +602,8 @@ async def fetch_ashby(client, keywords, companies):
 async def fetch_yc(client, keywords):
     """Queries YC's Work at a Startup board via their public Algolia API."""
     logger.info("Searching Y Combinator...")
-    url = "https://zgob769v03-dsn.algolia.net/1/indexes/jobs_prod/query?x-algolia-agent=Algolia%20for%20JavaScript%20(4.13.1)%3B%20Browser&x-algolia-api-key=de064d669069600600000000000000&x-algolia-application-id=ZGOB769V03"
+    # Switched to a more stable Algolia host and fixed 'Aolia' -> 'Algolia' typo
+    url = "https://zgob769v03-3.algolianet.com/1/indexes/jobs_prod/query?x-algolia-agent=Algolia%20for%20JavaScript%20(4.13.1)%3B%20Browser&x-algolia-api-key=de064d669069600600000000000000&x-algolia-application-id=ZGOB769V03"
     jobs = []
 
     # We'll search for each keyword
@@ -639,6 +640,7 @@ async def fetch_google_jobs(client, keywords):
 
     logger.info("Searching Google Jobs (LinkedIn/Indeed aggregator)...")
     jobs = []
+    # Use your most important keyword for this high-value search
     query = f"{keywords[0]} in Austin"
     url = f"https://www.searchapi.io/api/v1/search?engine=google_jobs&q={query}&api_key={api_key}"
 
@@ -712,12 +714,11 @@ async def main():
             fetch_adzuna(client, keywords),
         ]
 
-        # Conditional task: Google Jobs (Run every 3 days to save SearchApi credits)
-        # Check if day of year is divisible by 3
-        if datetime.now().timetuple().tm_yday % 3 == 0:
+        # Conditional task: Google Jobs (Run only on Sundays to save credits)
+        if datetime.now().weekday() == 6:
             tasks.append(fetch_google_jobs(client, keywords))
         else:
-            logger.info("Skipping Google Jobs today to save SearchAPI credits.")
+            logger.info("Skipping Google Jobs today (Scheduled for Sunday only).")
 
         results = await asyncio.gather(*tasks)
 
