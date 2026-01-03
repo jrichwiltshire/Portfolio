@@ -78,7 +78,7 @@ class JobDatabase:
         try:
             self.conn.execute("ALTER TABLE jobs ADD COLUMN why_me TEXT")
         except sqlite3.OperationalError:
-            pass # Column already exists
+            pass  # Column already exists
         self.conn.commit()
 
     def job_exists(self, external_id):
@@ -103,7 +103,7 @@ class JobDatabase:
                 job.min_salary,
                 job.max_salary,
                 0,
-                job.why_me
+                job.why_me,
             ),
         )
         self.conn.commit()
@@ -117,9 +117,9 @@ def extract_salary(text):
     """
     if not text:
         return (None, None)
-    
+
     text = text.lower().replace(",", "")
-    
+
     # 1. Hourly check ($50-80/hr)
     hourly_matches = re.findall(r"\$(\d+)(?:-\$(\d+))?/hr", text)
     if hourly_matches:
@@ -140,7 +140,9 @@ def extract_salary(text):
     # Look for large numbers
     std_matches = re.findall(r"\$(\d{4,7})", text)
     if std_matches:
-        nums = [int(m) for m in std_matches if int(m) > 15000] # Filter out tiny numbers
+        nums = [
+            int(m) for m in std_matches if int(m) > 15000
+        ]  # Filter out tiny numbers
         if nums:
             return (min(nums), max(nums))
 
@@ -253,6 +255,8 @@ async def fetch_hacker_news(client, keywords):
             resp = await client.get(search_url + kw)
             hits = resp.json().get("hits", [])
             for hit in hits:
+                comment = hit.get("comment_text", "")
+                sal_min, sal_max = extract_salary(comment)
                 jobs.append(
                     JobListing(
                         source="HackerNews",
@@ -261,8 +265,10 @@ async def fetch_hacker_news(client, keywords):
                         company="HN Startup",
                         location="Remote/Hybrid",
                         link=f"https://news.ycombinator.com/item?id={hit['objectID']}",
-                        description=hit.get("comment_text", ""),
+                        description=comment,
                         posted_date=datetime.now().strftime("%Y-%m-%d"),
+                        min_salary=sal_min,
+                        max_salary=sal_max,
                     )
                 )
     except Exception as e:
@@ -592,6 +598,75 @@ async def fetch_ashby(client, keywords, companies):
     return jobs
 
 
+# 11. Y Combinator (Work at a Startup)
+async def fetch_yc(client, keywords):
+    """Queries YC's Work at a Startup board via their public Algolia API."""
+    logger.info("Searching Y Combinator...")
+    url = "https://zgob769v03-dsn.algolia.net/1/indexes/jobs_prod/query?x-algolia-agent=Algolia%20for%20JavaScript%20(4.13.1)%3B%20Browser&x-algolia-api-key=de064d669069600600000000000000&x-algolia-application-id=ZGOB769V03"
+    jobs = []
+
+    # We'll search for each keyword
+    for kw in keywords[:3]:
+        payload = {"query": kw, "hitsPerPage": 20, "filters": "jobType:full_time"}
+        try:
+            res = await client.post(url, json=payload)
+            hits = res.json().get("hits", [])
+            for hit in hits:
+                jobs.append(
+                    JobListing(
+                        source="YC",
+                        external_id=f"yc-{hit['id']}",
+                        title=hit["title"],
+                        company=hit["companyName"],
+                        location=hit.get("location", "Remote/Hybrid"),
+                        link=f"https://www.workatastartup.com/jobs/{hit['id']}",
+                        description=hit.get("description", ""),
+                        posted_date=datetime.now().strftime("%Y-%m-%d"),
+                        min_salary=hit.get("minSalary"),
+                        max_salary=hit.get("maxSalary"),
+                    )
+                )
+        except Exception as e:
+            logger.error(f"YC ({kw}) failed: {e}")
+    return jobs
+
+
+# 12. Google Jobs (via SearchApi - aggregates LinkedIn/Indeed)
+async def fetch_google_jobs(client, keywords):
+    api_key = os.getenv("SEARCHAPI_API_KEY")
+    if not api_key:
+        return []
+
+    logger.info("Searching Google Jobs (LinkedIn/Indeed aggregator)...")
+    jobs = []
+    query = f"{keywords[0]} in Austin"
+    url = f"https://www.searchapi.io/api/v1/search?engine=google_jobs&q={query}&api_key={api_key}"
+
+    try:
+        res = await client.get(url)
+        results = res.json().get("jobs_results", [])
+        for item in results:
+            jobs.append(
+                JobListing(
+                    source=f"Google-{item.get('via', 'Search')}",
+                    external_id=f"gj-{item['job_id']}",
+                    title=item["title"],
+                    company=item["company_name"],
+                    location=item.get("location", "Unknown"),
+                    link=(
+                        item["related_links"][0]["link"]
+                        if item.get("related_links")
+                        else ""
+                    ),
+                    description=item.get("description", ""),
+                    posted_date=datetime.now().strftime("%Y-%m-%d"),
+                )
+            )
+    except Exception as e:
+        logger.error(f"Google Jobs failed: {e}")
+    return jobs
+
+
 # --- 3. MAIN ORCHESTRATOR
 async def main():
     db = JobDatabase()
@@ -621,9 +696,10 @@ async def main():
     logger.info("Starting Async Job Search...")
 
     async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-        # Launch all fetchers in parallel
+        # Launch standard fetchers in parallel
         tasks = [
             fetch_hacker_news(client, keywords),
+            fetch_yc(client, keywords),
             fetch_arbeitnow(client, keywords),
             fetch_remote_ok(client, keywords),
             fetch_remotive(client, keywords),
@@ -635,6 +711,13 @@ async def main():
             fetch_ashby(client, keywords, ashby_companies),
             fetch_adzuna(client, keywords),
         ]
+
+        # Conditional task: Google Jobs (Run every 3 days to save SearchApi credits)
+        # Check if day of year is divisible by 3
+        if datetime.now().timetuple().tm_yday % 3 == 0:
+            tasks.append(fetch_google_jobs(client, keywords))
+        else:
+            logger.info("Skipping Google Jobs today to save SearchAPI credits.")
 
         results = await asyncio.gather(*tasks)
 
@@ -649,7 +732,7 @@ async def main():
             async with ai_semaphore:
                 fit = await calculate_fit_score(job, MY_RESUME)
                 if fit["score"] >= 7:
-                    job.why_me = fit.get("why_me") # Save the pitch
+                    job.why_me = fit.get("why_me")  # Save the pitch
                     db.upsert_job(job)
                     send_notification(job, fit)
                     logger.info(f"MATCH: {job.title} ({fit['score']}/10)")
