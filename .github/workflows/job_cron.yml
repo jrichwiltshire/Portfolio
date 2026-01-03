@@ -2,7 +2,7 @@ name: Hourly Job Search
 
 on:
   schedule:
-    - cron: '0 * * * *' # Runs every hour on the dot
+    - cron: '0 15,23 * * *' # Runs at 9:00 AM and 5:00 PM Austin Time (roughly)
   workflow_dispatch: # Allows you to run it manually from the Github UI
 
 jobs:
@@ -28,6 +28,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
           ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
+          SEARCHAPI_API_KEY: ${{ secrets.SEARCHAPI_API_KEY }}
         run: |
           cd projects/JobSearchAggregator
           mkdir -p ../../docs
