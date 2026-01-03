@@ -602,8 +602,7 @@ async def fetch_ashby(client, keywords, companies):
 async def fetch_yc(client, keywords):
     """Queries YC's Work at a Startup board via their public Algolia API."""
     logger.info("Searching Y Combinator...")
-    # Switched to a more stable Algolia host and fixed 'Aolia' -> 'Algolia' typo
-    url = "https://zgob769v03-3.algolianet.com/1/indexes/jobs_prod/query?x-algolia-agent=Algolia%20for%20JavaScript%20(4.13.1)%3B%20Browser&x-algolia-api-key=de064d669069600600000000000000&x-algolia-application-id=ZGOB769V03"
+    url = "https://zgob769v03-dsn.algolia.net/1/indexes/jobs_prod/query?x-algolia-agent=Algolia%20for%20JavaScript%20(4.13.1)%3B%20Browser&x-algolia-api-key=de064d66906960060000000000000000&x-algolia-application-id=ZGOB769V03"
     jobs = []
 
     # We'll search for each keyword
@@ -672,8 +671,8 @@ async def fetch_google_jobs(client, keywords):
 # --- 3. MAIN ORCHESTRATOR
 async def main():
     db = JobDatabase()
-    # Limit to 3 concurrent AI calls to stay under rate limits
-    ai_semaphore = asyncio.BoundedSemaphore(3)
+    # Limit to 2 concurrent AI calls to stay under your strict 3 RPM limit
+    ai_semaphore = asyncio.BoundedSemaphore(2)
 
     keywords = [
         "Data Analyst",
@@ -737,6 +736,8 @@ async def main():
                     db.upsert_job(job)
                     send_notification(job, fit)
                     logger.info(f"MATCH: {job.title} ({fit['score']}/10)")
+                    # Added safety sleep to respect 3 RPM limit
+                    await asyncio.sleep(22)
                     return True
         return False
 
