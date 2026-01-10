@@ -602,7 +602,8 @@ async def fetch_ashby(client, keywords, companies):
 async def fetch_yc(client, keywords):
     """Queries YC's Work at a Startup board via their public Algolia API."""
     logger.info("Searching Y Combinator...")
-    url = "https://zgob769v03-dsn.algolia.net/1/indexes/jobs_prod/query?x-algolia-agent=Algolia%20for%20JavaScript%20(4.13.1)%3B%20Browser&x-algolia-api-key=de064d66906960060000000000000000&x-algolia-application-id=ZGOB769V03"
+    # Corrected Algolia host and API key
+    url = "https://zgob769v03-3.algolianet.com/1/indexes/jobs_prod/query?x-algolia-agent=Algolia%20for%20JavaScript%20(4.13.1)%3B%20Browser&x-algolia-api-key=de064d6690696ca00600000000000000&x-algolia-application-id=ZGOB769V03"
     jobs = []
 
     # We'll search for each keyword
