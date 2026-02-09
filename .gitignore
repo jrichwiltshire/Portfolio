@@ -179,3 +179,4 @@ cython_debug/
 *.parquet
 *.gz
 docs/job_aggregator.db
+.aider*

@@ -1,0 +1,41 @@
+version: '3.8' # Or '3' if your Docker Compose version is older
+
+services:
+  freshrss:
+    image: freshrss/freshrss:latest
+    container_name: freshrss_local
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+        # Map host port 8080 to container port 80
+        # You can change 8080 if it's already in use on your machine
+    volumes:
+      # Persist FreshRSS data (feeds, articles, users, settings)
+      - ./data:/var/www/FreshRSS/data
+      # Persist FreshRSS extensions (optional, but good practice)
+      - ./extensions:/var/www/FreshRSS/extensions
+      # Persist FreshRSS users' custom CSS (optional)
+      - ./p:/var/www/FreshRSS/p
+    environment:
+      # Set your timezone. Find yours here: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+      TZ: 'Europe/London' # <-- CHANGE THIS TO YOUR TIMEZONE
+      # How often FreshRSS should check for new articles
+      CRON_PERIOD: '15m' # e.g., '5m' for 5 minutes, '1h' for 1 hour
+    # Healthcheck (optional but recommended)
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -q --spider --proxy=off localhost:80/i/index.php?c=feed&a=actualize || exit 1" ]
+      interval: 5m
+      timeout: 30s
+      retries: 3
+      start_period: 30s
+
+# You don't strictly need named volumes for this simple setup,
+# but if you wanted to manage them separately, you could define them here:
+# volumes:
+#   freshrss_data:
+#   freshrss_extensions:
+#   freshrss_p:
+# And then change the volume mappings above to:
+#   - freshrss_data:/var/www/FreshRSS/data
+#   - freshrss_extensions:/var/www/FreshRSS/extensions
+#   - freshrss_p:/var/www/FreshRSS/p
