@@ -180,3 +180,4 @@ cython_debug/
 *.gz
 docs/job_aggregator.db
 .aider*
+.claude
