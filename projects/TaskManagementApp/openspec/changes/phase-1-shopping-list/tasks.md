@@ -23,7 +23,7 @@
 
 ## 4. Deployment
 
-- [ ] 4.1 Add a `Procfile` with the command to start Flet in web mode on `$PORT`
+- [x] 4.1 Add a `Procfile` with the command to start Flet in web mode on `$PORT`
 - [ ] 4.2 Push code to GitHub and connect the repo to Railway
 - [ ] 4.3 Add `firebase_service_account_key.json` as a Railway environment secret (do not commit the key to git — confirm it is in `.gitignore`)
 - [ ] 4.4 Verify the app loads at the Railway HTTPS URL from a desktop browser
