@@ -26,6 +26,6 @@
 - [x] 4.1 Add a `Procfile` with the command to start Flet in web mode on `$PORT`
 - [x] 4.2 Push code to GitHub and connect the repo to Railway
 - [x] 4.3 Add `firebase_service_account_key.json` as a Railway environment secret (do not commit the key to git — confirm it is in `.gitignore`)
-- [ ] 4.4 Verify the app loads at the Railway HTTPS URL from a desktop browser
-- [ ] 4.5 Open the Railway URL in Chrome on Pixel 8 and confirm the PWA "Add to Home Screen" prompt appears
-- [ ] 4.6 Install the PWA and verify it opens in standalone mode and syncs with desktop in real-time
+- [x] 4.4 Verify the app loads at the Railway HTTPS URL from a desktop browser
+- [x] 4.5 Open the Railway URL in Chrome on Pixel 8 and confirm the PWA "Add to Home Screen" prompt appears
+- [x] 4.6 Install the PWA and verify it opens in standalone mode and syncs with desktop in real-time
