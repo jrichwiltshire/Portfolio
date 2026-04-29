@@ -729,13 +729,12 @@ async def main():
         ):
             async with ai_semaphore:
                 fit = await calculate_fit_score(job, MY_RESUME)
+                await asyncio.sleep(22)  # Rate limit: ~2.7 RPM regardless of score
                 if fit["score"] >= 7:
-                    job.why_me = fit.get("why_me")  # Save the pitch
+                    job.why_me = fit.get("why_me")
                     db.upsert_job(job)
                     send_notification(job, fit)
                     logger.info(f"MATCH: {job.title} ({fit['score']}/10)")
-                    # Added safety sleep to respect 3 RPM limit
-                    await asyncio.sleep(22)
                     return True
         return False
 
