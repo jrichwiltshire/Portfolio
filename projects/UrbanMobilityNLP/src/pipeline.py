@@ -106,8 +106,7 @@ def build_topic_info(topic_model) -> pd.DataFrame:
             "count": count,
             "top_words": json.dumps(top_words),
         })
-    return
-pd.DataFrame(rows).sort_values("topic_id").reset_index(drop=True)
+    return pd.DataFrame(rows).sort_values("topic_id").reset_index(drop=True)
 
 def compute_umap_2d(embeddings: np.ndarray) -> np.ndarray:
     from umap import UMAP
