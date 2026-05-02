@@ -1,6 +1,6 @@
 ---
 name: git-commit
-description: 'Execute git commit with conventional commit message analysis, intelligent staging, and message generation. Use when user asks to commit changes, create a git commit, or mentions "/commit". Supports: (1) Auto-detecting type and scope from changes, (2) Generating conventional commit messages from diff, (3) Interactive commit with optional type/scope/description overrides, (4) Intelligent file staging for logical grouping'
+description: 'Execute git commit with conventional commit message analysis, intelligent staging, message generation, push, and PR creation. Use when user asks to commit changes, create a git commit, or mentions "/commit". Supports: (1) Auto-detecting type and scope from changes, (2) Generating conventional commit messages from diff, (3) Interactive commit with optional type/scope/description overrides, (4) Intelligent file staging for logical grouping, (5) Pushing to remote, (6) Opening a GitHub PR with generated description'
 license: MIT
 allowed-tools: Bash
 ---
@@ -106,6 +106,52 @@ git commit -m "$(cat <<'EOF'
 EOF
 )"
 ```
+
+### 5. Push to Remote
+
+After committing, push the branch:
+
+```bash
+# Check if branch has an upstream
+git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null
+
+# New branch (no upstream) — set upstream
+git push -u origin <branch-name>
+
+# Existing branch with upstream
+git push
+```
+
+### 6. Create Pull Request
+
+After pushing, open a PR unless:
+- The current branch is `main` or `master`
+- A PR already exists for this branch (`gh pr view` returns successfully)
+
+```bash
+# Check for existing PR
+gh pr view 2>/dev/null
+
+# Get commits since diverging from main for the PR body
+git log main..HEAD --oneline
+git diff main...HEAD
+
+# Create PR
+gh pr create --title "<concise title under 70 chars>" --body "$(cat <<'EOF'
+## Summary
+- <bullet 1>
+- <bullet 2>
+
+## Test plan
+- [ ] <testing step>
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)"
+```
+
+**PR title**: Use the first commit's subject if there's only one commit; otherwise write a broader summary of all commits.
+**PR body**: Summarize *why* these changes were made, not just what files changed. Include a short test plan checklist.
 
 ## Best Practices
 
