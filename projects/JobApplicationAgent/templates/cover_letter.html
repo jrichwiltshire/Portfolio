@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { size: letter; margin: 0.9in 1in; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Georgia", serif; font-size: 11pt; color: #1a1a1a; line-height: 1.6; }
+
+  .header { margin-bottom: 28pt; }
+  .header h1 { font-size: 16pt; font-weight: bold; letter-spacing: 0.03em; }
+  .contact { font-size: 9.5pt; color: #444; margin-top: 4pt; }
+  .contact span + span::before { content: " · "; }
+
+  .meta { margin-bottom: 24pt; }
+  .meta .date { font-size: 10.5pt; margin-bottom: 10pt; }
+  .meta .recipient { font-size: 10.5pt; font-weight: bold; }
+
+  .body p {
+    font-size: 11pt;
+    margin-bottom: 14pt;
+    text-align: left;
+  }
+
+  .closing { margin-top: 24pt; font-size: 11pt; }
+  .closing .sign-off { margin-bottom: 28pt; }
+  .closing .name { font-weight: bold; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>{{ name }}</h1>
+  <div class="contact">
+    {% if email %}<span>{{ email }}</span>{% endif %}
+    {% if phone %}<span>{{ phone }}</span>{% endif %}
+    {% if linkedin %}<span>{{ linkedin }}</span>{% endif %}
+    {% if location %}<span>{{ location }}</span>{% endif %}
+  </div>
+</div>
+
+<div class="meta">
+  <div class="date">{{ date }}</div>
+  <div class="recipient">Hiring Team, {{ company }}</div>
+</div>
+
+<div class="body">
+  {% for paragraph in paragraphs %}
+  <p>{{ paragraph }}</p>
+  {% endfor %}
+</div>
+
+<div class="closing">
+  <div class="sign-off">Best,</div>
+  <div class="name">{{ name }}</div>
+</div>
+
+</body>
+</html>
