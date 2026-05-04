@@ -691,22 +691,13 @@ async def main():
         "databricks",
         "coinbase",
     ]
-    lever_companies = [
-        "figma",
-        "amplitude",
-        "benchling",
-        "scale-ai",
-    ]
+    lever_companies = []  # All verified slugs 404'd; repopulate after manual verification
     ashby_companies = [
         "notion",
         "ramp",
         "incident",
         "vercel",
-        "brex",
-        "retool",
-        "wandb",      # Weights & Biases
-        "dagster",
-        "dbtlabs",
+        "retool",     # brex/wandb/dagster/dbtlabs all 404'd
     ]
 
     logger.info("Starting Async Job Search...")
@@ -715,7 +706,6 @@ async def main():
         # Launch standard fetchers in parallel
         tasks = [
             fetch_hacker_news(client, keywords),
-            fetch_yc(client, keywords),
             fetch_arbeitnow(client, keywords),
             fetch_remote_ok(client, keywords),
             fetch_remotive(client, keywords),
