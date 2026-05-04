@@ -12,10 +12,11 @@ import httpx
 import feedparser
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-import openai
+import google.generativeai as genai
 
 # --- CONFIGURATION ---
 load_dotenv()
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -154,30 +155,25 @@ async def calculate_fit_score(job: JobListing, resume_text: str):
     if not resume_text:
         return {"score": 5, "reason": "No resume provided."}
 
-    client = openai.AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    model = genai.GenerativeModel("gemini-2.0-flash")
 
-    prompt = f"""
-    Role: Career Coach
-    Task: Score this job fit (1-10) for the candidate.
+    prompt = f"""You are a career coach. Score this job fit (1-10) for the candidate.
 
-    Resume: {resume_text[:2000]}...
-    Job: {job.title} at {job.company}
-    Desc: {job.description[:2000]}...
+Resume: {resume_text[:2000]}
+Job: {job.title} at {job.company}
+Description: {job.description[:2000]}
 
-    Output JSON: {{ 
-        "score": int, 
-        "reason": "short string",
-        "why_me": "3 bullet points (max 50 words) explaining why I am a good fit based on my resume. Use markdown bullets."
-    }}
-    """
+Respond with ONLY valid JSON matching this schema exactly:
+{{"score": <integer 1-10>, "reason": "<one sentence>", "why_me": "<3 markdown bullet points, max 50 words total, explaining fit based on resume>"}}"""
 
     try:
-        response = await client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
+        response = await model.generate_content_async(
+            prompt,
+            generation_config=genai.types.GenerationConfig(
+                response_mime_type="application/json"
+            ),
         )
-        return json.loads(response.choices[0].message.content)
+        return json.loads(response.text)
     except Exception as e:
         logger.error(f"AI Error: {e}")
         return {"score": 0, "reason": "AI Error"}
@@ -186,6 +182,7 @@ async def calculate_fit_score(job: JobListing, resume_text: str):
 def send_notification(job: JobListing, fit_data: dict):
     webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
     if not webhook_url:
+        logger.warning("DISCORD_WEBHOOK_URL not set — skipping notification")
         return
 
     # Choose a color based on score: Green for 9-10, Yellow for 7-8
@@ -213,8 +210,8 @@ def send_notification(job: JobListing, fit_data: dict):
     }
     try:
         httpx.post(webhook_url, json=payload)
-    except:
-        pass
+    except Exception as e:
+        logger.error(f"Discord webhook failed: {e}")
 
 
 def is_duplicate(db, title, company):
@@ -732,13 +729,12 @@ async def main():
         ):
             async with ai_semaphore:
                 fit = await calculate_fit_score(job, MY_RESUME)
+                await asyncio.sleep(22)  # Rate limit: ~2.7 RPM regardless of score
                 if fit["score"] >= 7:
-                    job.why_me = fit.get("why_me")  # Save the pitch
+                    job.why_me = fit.get("why_me")
                     db.upsert_job(job)
                     send_notification(job, fit)
                     logger.info(f"MATCH: {job.title} ({fit['score']}/10)")
-                    # Added safety sleep to respect 3 RPM limit
-                    await asyncio.sleep(22)
                     return True
         return False
 
