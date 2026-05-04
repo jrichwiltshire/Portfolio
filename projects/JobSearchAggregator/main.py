@@ -169,7 +169,7 @@ The why_me field must be a single string with 3 bullet points (max 50 words tota
 
     try:
         response = await _groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="llama-3.1-8b-instant",
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
         )
