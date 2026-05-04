@@ -155,7 +155,16 @@ async def calculate_fit_score(job: JobListing, resume_text: str):
     if not resume_text:
         return {"score": 5, "reason": "No resume provided."}
 
-    prompt = f"""You are a career coach. Score this job fit (1-10) for the candidate.
+    prompt = f"""You are a career coach evaluating a job for a candidate based in Austin, TX.
+
+The candidate can ONLY accept:
+1. Fully remote positions with no required in-office days, OR
+2. Positions located in Austin, TX
+
+If the job requires in-office or on-site presence at any location other than Austin, TX — including hybrid schedules at a non-Austin office — respond with ONLY:
+{{"score": 1, "reason": "Requires in-office presence outside Austin, TX", "why_me": "N/A — location mismatch"}}
+
+Otherwise, score the fit (1-10) based on the candidate's resume below.
 
 Resume: {resume_text[:2000]}
 Job: {job.title} at {job.company}
@@ -433,7 +442,7 @@ async def fetch_jobespresso(client, keywords):
 # 6. Built In (Scraper) - Async
 async def fetch_built_in_austin(client, keywords, city="austin"):
     """Fetcher for Built In Austin (Scraping/API hybrid approach)"""
-    categories = ["data-analytics", "data-science"]
+    categories = ["data-analytics", "business-intelligence"]
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
@@ -515,7 +524,7 @@ async def fetch_greenhouse_companies(client, keywords, companies):
 
     for co in companies:
         logger.info(f"Checking Greenhouse board for {co}...")
-        url = f"https://boards-api.greenhouse.io/v1/boards/{co}/jobs"
+        url = f"https://boards-api.greenhouse.io/v1/boards/{co}/jobs?content=true"
         try:
             res = await client.get(url)
             data = res.json().get("jobs", [])
@@ -523,15 +532,17 @@ async def fetch_greenhouse_companies(client, keywords, companies):
                 title = item["title"]
 
                 if any(k.lower() in title.lower() for k in keywords):
+                    raw_html = item.get("content", "")
+                    description = BeautifulSoup(raw_html, "lxml").get_text(separator=" ", strip=True)[:2000] if raw_html else ""
                     jobs.append(
                         JobListing(
                             source=f"Greehouse-{co}",
                             external_id=f"gh-{item['id']}",
                             title=title,
                             company=co.capitalize(),
-                            location=item.get("location", {}).get("name", "Remote"),
+                            location=item.get("location", {}).get("name", ""),
                             link=item["absolute_url"],
-                            description="View Greenhouse for details",
+                            description=description,
                             posted_date=datetime.now().strftime("%Y-%m-%d"),
                         )
                     )
@@ -581,15 +592,17 @@ async def fetch_ashby(client, keywords, companies):
             for item in data:
                 title = item["title"]
                 if any(k.lower() in title.lower() for k in keywords):
+                    raw_html = item.get("descriptionHtml", "")
+                    description = BeautifulSoup(raw_html, "lxml").get_text(separator=" ", strip=True)[:2000] if raw_html else ""
                     jobs.append(
                         JobListing(
                             source=f"Ashby-{co}",
                             external_id=f"ash-{item['id']}",
                             title=title,
                             company=co.capitalize(),
-                            location=item.get("location", "Remote"),
+                            location=item.get("location", ""),
                             link=item["jobUrl"],
-                            description="See Ashby Link",
+                            description=description,
                             posted_date=datetime.now().strftime("%Y-%m-%d"),
                         )
                     )
@@ -675,10 +688,11 @@ async def main():
     db = JobDatabase()
     keywords = [
         "Data Analyst",
-        "Data Scientist",
-        "Analytics",
-        "Machine Learning",
+        "Analytics Engineer",
+        "Growth Analyst",
         "BI Developer",
+        "Data Scientist",
+        "Business Intelligence",
     ]
 
     # Target Companies Lists

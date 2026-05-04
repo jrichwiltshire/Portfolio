@@ -1,49 +1,51 @@
-﻿Jared Richard Wiltshire 
-jared.r.wiltshire@gmail.com
-(817) 602-3523
-Austin, TX
+Jared Richard Wiltshire
+jared.r.wiltshire@gmail.com · (817) 602-3523 · linkedin.com/in/jared-r-wiltshire-86757651 · Austin, TX
 
+SUMMARY
+Data Scientist with 10+ years in full-funnel marketing analytics, machine learning, and scalable data pipelines. Built end-to-end analytical infrastructure (Python, SQL, dbt, GCP) that drives growth decisions — from automated reporting pipelines processing 1B+ monthly records to ML lead scoring that lifted conversion 21%. Led cross-functional analytics teams and translated complex growth data into executive-ready narratives. Finance background (UCF, Vanguard Group) provides native fluency in the quantitative rigor that financial and crypto markets demand.
 
-PROFESSIONAL SUMMARY
-Data Scientist specializing in Product Analytics with 10+ years driving product growth through machine learning, quantitative analysis, and advanced analytics. Proven track record influencing $5.6M+ in product revenue through data-driven feature recommendations and conversion optimization (21% improvement). Technical expertise in building production ML systems (Python, SQL, GCP) that improve user engagement, reduce churn, and optimize product funnels through statistical analysis. Skilled at translating complex analytical insights into actionable product strategy for C-suite, Engineering, and Product teams while managing high-volume data environments (1B+ monthly records) and leading cross-functional analytics teams.
-PRODUCT IMPACT HIGHLIGHTS
-* Influenced $5.6M+ in product revenue through data-driven feature recommendations
-* Optimized product conversion funnel via ML lead scoring (21% improvement)
-* Identified user behavioral segments driving product adoption (13% engagement lift)
-* Reduced customer churn through predictive analytics and intervention system
-* Presented product performance insights to C-suite weekly, shaping product strategy
-SKILLS 
-* Product Analytics: User Behavior Analysis, Conversion Funnel Optimization, Customer Segmentation, Cohort Analysis, Product Metrics, Product Development Strategy, Product Roadmap Influence
-* Statistics & Quantitative Analysis: Statistical Modeling, Hypothesis Testing, Quantitative Analysis, Forecasting, Predictive Analytics, Statistical Inference
-* Data Science & ML: Predictive Modeling, Classification (Logistic Regression, Gradient Boosting, XGBoost), Clustering (KMeans, Agglomerative), Random Forests, Feature Engineering, Statistical Modeling
-* AI/LLM: Claude Code CLI, Gemini, Claude Code agents, GenAI
-* Programming Languages: Python (NumPy, Pandas, Polars, GCloud, Scikit-learn, Matplotlib), SQL, LookML, HTML/CSS
-* Cloud Platforms: Google Cloud Platform (BigQuery, Pub/Sub, App Engine, VertexAI, Cloud Run, Dataform), dbt, Docker
-* Data Visualization: Looker, Tableau
-* Data Engineering: ETL Pipeline Development, Data Warehousing, Data Governance
-* Other: Version Control (GitHub), Marketing Funnel Analysis, CAC, LTV, ROAS
+KEY ACHIEVEMENTS
+- Built ML lead scoring system that improved conversion rates 21%
+- Influenced $5.6M+ in product revenue through data-driven feature and growth recommendations
+- Identified user behavioral segments driving product adoption (13% engagement lift)
+- Reduced customer churn through predictive analytics and an early-warning intervention system
+- Delivered growth performance insights to C-suite weekly, shaping acquisition and retention strategy
 
+EXPERIENCE
 
-WORK EXPERIENCE 
-Auctane LLC | Apr 2021 – Present |Senior Data Analyst II (Data Scientist) | Austin, TX
-Consistently delivered high-impact analytical solutions, driving swift progression from Senior Business Analyst to Senior Data Analyst II. Team Lead for 11-member analytics team including four senior analysts and five junior analysts.
-* Built predictive churn model using Python and scikit-learn, deployed via GCP Cloud Run, enabling proactive user retention interventions through early-warning system integrated with product and support workflows, reducing at-risk customer churn
-* Developed ML-powered lead scoring system using Logistic Regression and Gradient Boosting that optimized product conversion funnel, achieving 21% increase in conversion rates and directly informing product team's onboarding optimization strategy; deployed via Cloud Run with real-time Segment integration
-* Created user segmentation models using KMeans clustering to analyze behavioral patterns and identify distinct user personas, driving 13% improvement in feature adoption and directly informing product roadmap prioritization for 2024-2025
-* Drove product development and product strategy through weekly executive presentations of quantitative analysis, user behavior insights, and product performance metrics, directly resulting in feature launches that generated $5.6M in new revenue
-* Streamlined data transformation, version control, and storage processes by pioneering development and maintenance of database structures using dbt, GitHub, LookML, and BigQuery, improving analyst productivity by 15 hours weekly
-* Improved Looker dashboard load times by 80% by architecting ETL pipelines that optimized data loading to newly created analytical tables, enhancing self-service analytics capabilities for product and marketing teams
-* Designed and implemented a Python-based geospatial solution using agglomerative clustering and statistical modeling to optimize 35 sales regions, creating an interactive map and data warehouse tables, improving territory management and streamlining hiring decisions supporting the 2025 company growth plan
-* Applied technical expertise in data engineering and software development to architect full-stack analytical solutions, bridging ML model development with production deployment across GCP infrastructure
-* Managed a development Google Cloud Platform (GCP) project, including creating service accounts, controlling access, and building full-scale applications utilized by other departments; responsible for analyzing data within multiple schemas in a database with over a billion records written monthly
-Arizona Department of Economic Security | Jan 2016 - Apr 2021 | Managing Analyst | Phoenix, AZ
-Accelerated career progression from Financial Analyst to Managing Analyst, demonstrating consistent high performance
-* Optimized $55M annual federal funding allocation using SQL, Python, Excel, and Tableau through quantitative analysis and statistical modeling, resulting in 60% increase in daycare reimbursement rates and enabling 14,000 waitlisted children to access high-quality childcare services
-* Directed team of three analysts, enhancing team performance and increasing reporting output by 66% through effective task delegation, report management, mentorship, and training initiatives in SQL and data visualization
-* Engineered strategic financial forecasts and policy proposals using statistical analysis and forecasting techniques, presented monthly to executive leadership, resulting in $23M annual reduction in outlays and optimized fund management
-* Formulated a comprehensive quarterly scorecard using SQL, Tableau, and Excel, evaluating 600+ providers on performance metrics, enhancing program transparency and  information access via agency website
-The Vanguard Group | Aug 2014 - Dec 2015 | Investment Professional | Scottsdale, AZ
+Senior Data Analyst II, Auctane — Apr 2025 – Present
+- Built predictive churn model using Python and scikit-learn, deployed via GCP Cloud Run, enabling proactive retention interventions through an early-warning system integrated with product and support workflows
+- Developed ML model to predict customer LTV residuals, improving precision of lifetime value estimates used to inform product and revenue strategy
+- Improved ML lead scoring system using Gradient Boosting, achieving additional conversion rate lift; deployed via Cloud Run with real-time Segment integration
+- Designed Python-based geospatial solution using agglomerative clustering to optimize 35 sales regions, delivering an interactive map and data warehouse tables supporting the 2025 growth plan
+- Presented full-funnel performance metrics and user behavior insights to executives weekly, contributing to feature launches that generated $5.6M in new revenue
+- Managed a development GCP project with service account creation, access control, and full-scale applications across schemas processing 1B+ monthly records
+- Built Streamlit, Marimo, and Plotly dashboards to expand self-service analytics beyond traditional BI tooling
 
+Senior Data Analyst, Auctane — Apr 2021 – Apr 2025
+- Developed ML lead scoring system using Logistic Regression that achieved a 21% increase in conversion rates; deployed via HubSpot with real-time integration
+- Created user segmentation models using KMeans clustering to identify distinct user personas, driving 13% improvement in feature adoption and informing roadmap prioritization
+- Led development and maintenance of database structures using dbt, GitHub, LookML, and BigQuery, improving analyst productivity by 15 hours weekly
+- Improved Looker dashboard load times by 80% by architecting ETL pipelines that optimized data loading to new analytical tables, enabling self-service analytics for growth, product, and marketing teams
 
-EDUCATION 
-University of Central Florida | May 2014 | BS, Finance | Orlando, FL
+Managing Analyst, Arizona Department of Economic Security — Oct 2018 – Apr 2021
+- Directed a team of three analysts, increasing reporting output by 66%
+- Developed statewide ratebook for the Department of Developmental Disabilities (~$2B annual expenditures, 35,000+ Arizonans served)
+- Built quarterly scorecard using SQL, Tableau, and Excel evaluating 600+ providers on performance metrics
+- Analyzed and presented financial forecasts to executive leadership using Tableau and SQL
+
+Senior Financial Analyst, Arizona Department of Economic Security — Dec 2016 – Oct 2018
+- Reduced planned outlays by $23M in one year through cost analysis and policy proposals
+- Managed 10 grants totaling over $100M, monitoring daily spending and maintaining compliance
+
+Financial Analyst, Arizona Department of Economic Security — Jan 2016 – Dec 2016
+- Built financial forecasts contributing to $55M annual federal funding optimization
+
+Investment Professional, Vanguard — Aug 2014 – Dec 2015
+- Guided clients on asset allocation; handled 30–60 client situations daily
+
+SKILLS
+Python (scikit-learn, Pandas, Polars, NumPy) · SQL · dbt · BigQuery · GCP (Cloud Run, Pub/Sub, Vertex AI, Dataform) · Looker / LookML · Tableau · ETL Pipeline Development · Full Funnel Analytics · CAC / LTV / ROAS · Predictive Modeling · Customer Segmentation · Hypothesis Testing · Docker
+
+EDUCATION
+BS, Finance — University of Central Florida — May 2014
