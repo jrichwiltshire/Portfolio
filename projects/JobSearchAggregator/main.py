@@ -12,11 +12,11 @@ import httpx
 import feedparser
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-import google.generativeai as genai
+from groq import AsyncGroq
 
 # --- CONFIGURATION ---
 load_dotenv()
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+_groq_client = AsyncGroq(api_key=os.getenv("GROQ_API_KEY"))
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -155,8 +155,6 @@ async def calculate_fit_score(job: JobListing, resume_text: str):
     if not resume_text:
         return {"score": 5, "reason": "No resume provided."}
 
-    model = genai.GenerativeModel("gemini-2.0-flash")
-
     prompt = f"""You are a career coach. Score this job fit (1-10) for the candidate.
 
 Resume: {resume_text[:2000]}
@@ -167,16 +165,15 @@ Respond with ONLY valid JSON matching this schema exactly:
 {{"score": <integer 1-10>, "reason": "<one sentence>", "why_me": "<3 markdown bullet points, max 50 words total, explaining fit based on resume>"}}"""
 
     try:
-        response = await model.generate_content_async(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
-                response_mime_type="application/json"
-            ),
+        response = await _groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
         )
-        return json.loads(response.text)
+        return json.loads(response.choices[0].message.content)
     except Exception as e:
         logger.error(f"AI Error: {e}")
-        return {"score": 0, "reason": "AI Error"}
+        return {"score": 5, "reason": "AI unavailable — unscored"}
 
 
 def send_notification(job: JobListing, fit_data: dict):
@@ -374,7 +371,7 @@ async def fetch_remotive(client, keywords):
 async def fetch_wwr(client, keywords):
     feeds = [
         "https://weworkremotely.com/categories/remote-back-end-programming-jobs.rss",
-        "https://weworkremotely.com/categories/data-analysis.rss",
+        "https://weworkremotely.com/categories/remote-data-science-jobs.rss",
     ]
     jobs = []
     try:
@@ -600,7 +597,7 @@ async def fetch_yc(client, keywords):
     """Queries YC's Work at a Startup board via their public Algolia API."""
     logger.info("Searching Y Combinator...")
     # Corrected Algolia host and API key
-    url = "https://zgob769v03-3.algolianet.com/1/indexes/jobs_prod/query?x-algolia-agent=Algolia%20for%20JavaScript%20(4.13.1)%3B%20Browser&x-algolia-api-key=de064d6690696ca00600000000000000&x-algolia-application-id=ZGOB769V03"
+    url = "https://zgob769v03.algolia.net/1/indexes/jobs_prod/query?x-algolia-api-key=de064d6690696ca00600000000000000&x-algolia-application-id=ZGOB769V03"
     jobs = []
 
     # We'll search for each keyword
@@ -669,9 +666,6 @@ async def fetch_google_jobs(client, keywords):
 # --- 3. MAIN ORCHESTRATOR
 async def main():
     db = JobDatabase()
-    # Limit to 2 concurrent AI calls to stay under your strict 3 RPM limit
-    ai_semaphore = asyncio.BoundedSemaphore(2)
-
     keywords = [
         "Data Analyst",
         "Data Scientist",
@@ -682,15 +676,31 @@ async def main():
 
     # Target Companies Lists
     gh_companies = [
-        "crowdstrike",
         "cloudflare",
         "roblox",
-        "atlassian",
-        "spotify",
         "discord",
+        "anthropic",   # moved from Lever
+        "stripe",
+        "databricks",
+        "coinbase",
     ]
-    lever_companies = ["linear", "anthropic", "netflix", "twitch"]
-    ashby_companies = ["notion", "ramp", "incident", "vercel"]
+    lever_companies = [
+        "figma",
+        "amplitude",
+        "benchling",
+        "scale-ai",
+    ]
+    ashby_companies = [
+        "notion",
+        "ramp",
+        "incident",
+        "vercel",
+        "brex",
+        "retool",
+        "wandb",      # Weights & Biases
+        "dagster",
+        "dbtlabs",
+    ]
 
     logger.info("Starting Async Job Search...")
 
@@ -723,22 +733,33 @@ async def main():
     all_jobs = [job for sublist in results for job in sublist]
     logger.info(f"Fetched {len(all_jobs)} total jobs. Filtering & Scoring...")
 
+    _LOCATION_WHITELIST = [
+        "remote", "hybrid", "austin", "texas",
+        "anywhere", "worldwide", "united states", "usa",
+        "us only", "north america", "us-based", "us based",
+    ]
+
+    def is_location_relevant(location: str) -> bool:
+        if not location:
+            return True
+        return any(kw in location.lower() for kw in _LOCATION_WHITELIST)
+
     async def score_and_notify(job):
+        if not is_location_relevant(job.location):
+            return False
         if not db.job_exists(job.external_id) and not is_duplicate(
             db, job.title, job.company
         ):
-            async with ai_semaphore:
-                fit = await calculate_fit_score(job, MY_RESUME)
-                await asyncio.sleep(22)  # Rate limit: ~2.7 RPM regardless of score
-                if fit["score"] >= 7:
-                    job.why_me = fit.get("why_me")
-                    db.upsert_job(job)
-                    send_notification(job, fit)
-                    logger.info(f"MATCH: {job.title} ({fit['score']}/10)")
-                    return True
+            fit = await calculate_fit_score(job, MY_RESUME)
+            if fit["score"] >= 7:
+                job.why_me = fit.get("why_me")
+                db.upsert_job(job)
+                send_notification(job, fit)
+                logger.info(f"MATCH: {job.title} ({fit['score']}/10)")
+                return True
         return False
 
-    # Run scoring tasks in parallel (but throttled by semaphore)
+    # Run scoring tasks in parallel
     scoring_tasks = [score_and_notify(job) for job in all_jobs]
     results = await asyncio.gather(*scoring_tasks)
     new_count = sum(1 for r in results if r)
