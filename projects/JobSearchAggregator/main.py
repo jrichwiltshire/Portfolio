@@ -161,8 +161,11 @@ Resume: {resume_text[:2000]}
 Job: {job.title} at {job.company}
 Description: {job.description[:2000]}
 
-Respond with ONLY valid JSON matching this schema exactly:
-{{"score": <integer 1-10>, "reason": "<one sentence>", "why_me": "<3 markdown bullet points, max 50 words total, explaining fit based on resume>"}}"""
+Respond with ONLY valid JSON. All values must be primitives — no arrays.
+Use this exact schema:
+{{"score": 7, "reason": "One sentence.", "why_me": "* Bullet one\\n* Bullet two\\n* Bullet three"}}
+
+The why_me field must be a single string with 3 bullet points (max 50 words total) separated by newlines."""
 
     try:
         response = await _groq_client.chat.completions.create(
@@ -170,7 +173,11 @@ Respond with ONLY valid JSON matching this schema exactly:
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
         )
-        return json.loads(response.choices[0].message.content)
+        result = json.loads(response.choices[0].message.content)
+        # Defensive: model sometimes returns why_me as a list despite instructions
+        if isinstance(result.get("why_me"), list):
+            result["why_me"] = "\n".join(result["why_me"])
+        return result
     except Exception as e:
         logger.error(f"AI Error: {e}")
         return {"score": 5, "reason": "AI unavailable — unscored"}
@@ -744,13 +751,18 @@ async def main():
             return True
         return any(kw in location.lower() for kw in _LOCATION_WHITELIST)
 
+    # 2 concurrent + 3s sleep = ~24 RPM, safely under Groq free tier (30 RPM)
+    ai_semaphore = asyncio.BoundedSemaphore(2)
+
     async def score_and_notify(job):
         if not is_location_relevant(job.location):
             return False
         if not db.job_exists(job.external_id) and not is_duplicate(
             db, job.title, job.company
         ):
-            fit = await calculate_fit_score(job, MY_RESUME)
+            async with ai_semaphore:
+                fit = await calculate_fit_score(job, MY_RESUME)
+                await asyncio.sleep(3)
             if fit["score"] >= 7:
                 job.why_me = fit.get("why_me")
                 db.upsert_job(job)
